@@ -220,7 +220,7 @@ class Santas_lab(object):
         for dp in self.temp_output:
             self.output.write(dp[0] + "," + dp[1] + "," + dp[2] + "," + dp[3] + "\n");
 
-        print("Working on day : " + str(day) + " Remaining Toys : " + str(len(unassigned_old_toys.keys())))
+        print("Working on day : " + str(day) + " Remainig Toys : " + str(len(unassigned_old_toys.keys())))
         #Close the file
         self.output.close();
                                     
