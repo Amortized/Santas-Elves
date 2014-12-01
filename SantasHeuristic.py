@@ -169,7 +169,7 @@ class Santas_lab(object):
                 candidate_gp_elves = [self.general_purpose_elves[elf_id] for elf_id in self.general_purpose_elves.keys() if self.general_purpose_elves[elf_id].next_available_time <= minute];
                 candidate_lp_elves = [self.low_productive_elves[elf_id]  for elf_id in self.low_productive_elves.keys()  if self.low_productive_elves[elf_id].next_available_time <= minute];
 
-                if day % 10 == 0 and minute % 1400 == 0:
+                if day % 10 == 0 and minute == (day_to_minute+self.hrs.day_start):
                     print("Working on day : " + str(day) + " Unassigned Toys : " + str(len(unassigned_old_toys.keys())) + " GP Elves : " +str(len(candidate_gp_elves)) + " LP Elves : " + str(len(candidate_lp_elves)))
 
 
@@ -204,15 +204,18 @@ class Santas_lab(object):
 
         #If toys remaining beyond the last day
         while unassigned_old_toys:
-            if day % 10 == 0:
-                print("Working on day : " + str(day) + " Remaining Toys : " + str(len(unassigned_old_toys.keys())))
 
             day_to_minute  = day * 24 * 60;
             for minute in range(day_to_minute+self.hrs.day_start, day_to_minute+self.hrs.day_end):
+
+
                 if unassigned_old_toys:
                    #Use all the general purpose elves
                    candidate_gp_elves = [self.general_purpose_elves[elf_id] for elf_id in self.general_purpose_elves.keys() if self.general_purpose_elves[elf_id].next_available_time <= minute];
                    completed_job_ids  = self.allocate_RampUpPhase(unassigned_old_toys, candidate_gp_elves, 0, None);
+
+                   if day % 10 == 0 and minute == (day_to_minute+self.hrs.day_start):
+                       print("Working on day : " + str(day) + " Unassigned Toys : " + str(len(unassigned_old_toys.keys())) + " GP Elves : " +str(len(candidate_gp_elves)))
 
                    #Update the dict
                    for id in completed_job_ids:
@@ -227,7 +230,7 @@ class Santas_lab(object):
         for dp in self.temp_output:
             self.output.write(dp[0] + "," + dp[1] + "," + dp[2] + "," + dp[3] + "\n");
 
-        print("Working on day : " + str(day) + " Remainig Toys : " + str(len(unassigned_old_toys.keys())))
+        print("Working on day : " + str(day) + " Remaining Toys : " + str(len(unassigned_old_toys.keys())))
         #Close the file
         self.output.close();
                                     
@@ -241,7 +244,7 @@ if __name__ == '__main__':
     start = time.time()
 
     NUM_ELVES = 900;
-    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2_.csv');
+    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
     soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev2.csv')
     santa     = Santas_lab(NUM_ELVES, toy_file, soln_file)
     santa.allocate();
