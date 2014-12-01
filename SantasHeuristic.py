@@ -40,6 +40,7 @@ class Santas_lab(object):
             
         self.output = open(soln_file, "w")
         self.output.write("ToyId,ElfId,StartTime,Duration" + "\n")
+        self.temp_output = [];
         
     def read(self, toy_file):
         toys = []
@@ -84,7 +85,14 @@ class Santas_lab(object):
             # write to file in correct format
             tt = self.ref_time + datetime.timedelta(seconds=60*jobs[i].arrival_minute)
             time_string = " ".join([str(tt.year), str(tt.month), str(tt.day), str(tt.hour), str(tt.minute)])
-            self.output.write(str(jobs[i].id) + "," + str(elves[j].id) + "," + str(time_string) + "," + str(work_duration) + "\n" )
+            self.temp_output.append( ( str(jobs[i].id) , str(elves[j].id), str(time_string), str(work_duration) ) );
+
+            #Flushing non periodically to reduce the IO
+            if len(self.temp_output) == 500000:
+                #Flush
+                for dp in self.temp_output:
+                    self.output.write(dp[0] + "," + dp[1] + "," + dp[2] + "," + dp[3] + "\n");
+                del self.temp_output[:];
 
             #Mark as completed
             completed_toys.append(jobs[i].id)
@@ -208,12 +216,12 @@ class Santas_lab(object):
             #Next day
             day = day + 1;
 
+        #Flush the remaining
+        for dp in self.temp_output:
+            self.output.write(dp[0] + "," + dp[1] + "," + dp[2] + "," + dp[3] + "\n");
+
         print("Working on day : " + str(day) + " Remaining Toys : " + str(len(unassigned_old_toys.keys())))
-
-
-
-
-    #Close the file
+        #Close the file
         self.output.close();
                                     
             
@@ -226,7 +234,7 @@ if __name__ == '__main__':
     start = time.time()
 
     NUM_ELVES = 900;
-    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2_.csv');
+    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
     soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev2.csv')
     santa     = Santas_lab(NUM_ELVES, toy_file, soln_file)
     santa.allocate();
