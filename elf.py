@@ -8,8 +8,9 @@ class Elf:
         self.id = elfid
         self.rating = 1.0
         self.next_available_time = 540  # Santa's Workshop opens Jan 1, 2014 9:00 (= 540 minutes)
-        self.rating_increase = 1.02
-        self.rating_decrease = 0.90
+        self.rating_increase   = 1.02
+        self.rating_decrease   = 0.90
+        self.no_toys_completed = 0
 
     def update_elf(self, hrs, toy, start_minute, duration):
         """ Updates the elf's productivity rating and next available time based on last toy completed.
@@ -19,8 +20,10 @@ class Elf:
         :param duration: duration of work, in minutes
         :return: void
         """
+        self.no_toys_completed = self.no_toys_completed + 1;
         self.update_next_available_minute(hrs, start_minute, duration)
         self.update_productivity(hrs, start_minute, int(math.ceil(toy.duration / self.rating)))
+
 
     def update_next_available_minute(self, hrs, start_minute, duration):
         """ Apply the resting time constraint and determine the next minute when the elf can work next.
