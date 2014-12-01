@@ -161,10 +161,6 @@ class Santas_lab(object):
 
         for day in range(0, self.no_of_days+1):
             
-            if day % 10 == 0:
-                print("Working on day : " + str(day) + " Unassigned Toys : " + str(len(unassigned_old_toys.keys())))
-            
-            
             #Get all the toys which have arrived before today and haven't been assigned
             day_to_minute  = day * 24 * 60;
 
@@ -172,6 +168,10 @@ class Santas_lab(object):
                 #Find out all the elves which are available
                 candidate_gp_elves = [self.general_purpose_elves[elf_id] for elf_id in self.general_purpose_elves.keys() if self.general_purpose_elves[elf_id].next_available_time <= minute];
                 candidate_lp_elves = [self.low_productive_elves[elf_id]  for elf_id in self.low_productive_elves.keys()  if self.low_productive_elves[elf_id].next_available_time <= minute];
+
+                if day % 10 == 0 and minute % 1400 == 0:
+                    print("Working on day : " + str(day) + " Unassigned Toys : " + str(len(unassigned_old_toys.keys())) + " GP Elves : " +str(len(candidate_gp_elves)) + " LP Elves : " + str(len(candidate_lp_elves)))
+
 
                 #Get list of new toys which have arrived uptil this minute
                 new_toys = dict()
@@ -241,7 +241,7 @@ if __name__ == '__main__':
     start = time.time()
 
     NUM_ELVES = 900;
-    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
+    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2_.csv');
     soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev2.csv')
     santa     = Santas_lab(NUM_ELVES, toy_file, soln_file)
     santa.allocate();
