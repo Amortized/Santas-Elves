@@ -27,16 +27,16 @@ class Santas_lab(object):
         self.no_of_days               = int((self.toys[-1].arrival_minute)  / (24.0 * 60.0));  #No of days uptil which toys arrive
 
         #Elves(Divide the elf's into general purpose pool and low-productivity pool)
-        self.general_purpose_elves    = []
-        self.low_productive_elves     = [] #They will do the long tasks
+        self.general_purpose_elves    = dict()
+        self.low_productive_elves     = dict() #They will do the long tasks
 
         for i in range(0, (self.NUM_ELVES - self.LOW_PRODUCTIVE_ELVES)):
             elf = Elf(i)
-            self.general_purpose_elves.append(elf)
+            self.general_purpose_elves[elf.id] = elf
             
         for i in range(0, self.LOW_PRODUCTIVE_ELVES):
             elf = Elf(i)
-            self.low_productive_elves.append(elf)
+            self.low_productive_elves[elf.id]  = elf;
             
         self.output = open(soln_file, "w")
         self.output.write("ToyId,ElfId,StartTime,Duration" + "\n")
@@ -79,8 +79,15 @@ class Santas_lab(object):
         completed_toys = [];
 
         while i < len(jobs) and j < len(elves):
-            elves[j].next_available_time, work_duration = self.assign_elf_to_toy(jobs[i].arrival_minute, elves[j], jobs[i])
-            elves[j].update_elf(self.hrs, jobs[i], jobs[i].arrival_minute, work_duration)
+
+            if big_or_nonbig == "big":
+                self.low_productive_elves[elves[j].id].next_available_time, work_duration = self.assign_elf_to_toy(jobs[i].arrival_minute, self.low_productive_elves[elves[j].id], jobs[i])
+                self.low_productive_elves[elves[j].id].update_elf(self.hrs, jobs[i], jobs[i].arrival_minute, work_duration)
+            else:
+                self.general_purpose_elves[elves[j].id].next_available_time, work_duration = self.assign_elf_to_toy(jobs[i].arrival_minute, self.general_purpose_elves[elves[j].id], jobs[i])
+                self.general_purpose_elves[elves[j].id].update_elf(self.hrs, jobs[i], jobs[i].arrival_minute, work_duration)
+
+
 
             # write to file in correct format
             tt = self.ref_time + datetime.timedelta(seconds=60*jobs[i].arrival_minute)
@@ -155,7 +162,7 @@ class Santas_lab(object):
         for day in range(0, self.no_of_days+1):
             
             if day % 10 == 0:
-                print("Working on day : " + str(day))
+                print("Working on day : " + str(day) + " Unassigned Toys : " + str(len(unassigned_old_toys.keys())))
             
             
             #Get all the toys which have arrived before today and haven't been assigned
@@ -163,8 +170,8 @@ class Santas_lab(object):
 
             for minute in range(day_to_minute+self.hrs.day_start, day_to_minute+self.hrs.day_end):
                 #Find out all the elves which are available
-                candidate_gp_elves = [elf for elf in self.general_purpose_elves if elf.next_available_time <= minute];
-                candidate_lp_elves = [elf for elf in self.low_productive_elves  if elf.next_available_time <= minute];
+                candidate_gp_elves = [self.general_purpose_elves[elf_id] for elf_id in self.general_purpose_elves.keys() if self.general_purpose_elves[elf_id].next_available_time <= minute];
+                candidate_lp_elves = [self.low_productive_elves[elf_id]  for elf_id in self.low_productive_elves.keys()  if self.low_productive_elves[elf_id].next_available_time <= minute];
 
                 #Get list of new toys which have arrived uptil this minute
                 new_toys = dict()
@@ -204,7 +211,7 @@ class Santas_lab(object):
             for minute in range(day_to_minute+self.hrs.day_start, day_to_minute+self.hrs.day_end):
                 if unassigned_old_toys:
                    #Use all the general purpose elves
-                   candidate_gp_elves = [elf for elf in self.general_purpose_elves if elf.next_available_time <= minute];
+                   candidate_gp_elves = [self.general_purpose_elves[elf_id] for elf_id in self.general_purpose_elves.keys() if self.general_purpose_elves[elf_id].next_available_time <= minute];
                    completed_job_ids  = self.allocate_RampUpPhase(unassigned_old_toys, candidate_gp_elves, 0, None);
 
                    #Update the dict
