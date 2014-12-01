@@ -1,4 +1,4 @@
-__author__ = 'Rahul Manghwani'
+__author__ = 'Rahul'
 __date__ = 'November 27, 2014'
 
 import os
