@@ -30,11 +30,11 @@ class Santas_lab(object):
         self.general_purpose_elves    = dict()
         self.low_productive_elves     = dict() #They will do the long tasks
 
-        for i in range(0, (self.NUM_ELVES - self.LOW_PRODUCTIVE_ELVES)):
+        for i in range(self.LOW_PRODUCTIVE_ELVES+1, self.NUM_ELVES+1):
             elf = Elf(i)
             self.general_purpose_elves[elf.id] = elf
             
-        for i in range(0, self.LOW_PRODUCTIVE_ELVES):
+        for i in range(1, self.LOW_PRODUCTIVE_ELVES+1):
             elf = Elf(i)
             self.low_productive_elves[elf.id]  = elf;
             
@@ -81,16 +81,26 @@ class Santas_lab(object):
         while i < len(jobs) and j < len(elves):
 
             if big_or_nonbig == "big":
-                self.low_productive_elves[elves[j].id].next_available_time, work_duration = self.assign_elf_to_toy(jobs[i].arrival_minute, self.low_productive_elves[elves[j].id], jobs[i])
-                self.low_productive_elves[elves[j].id].update_elf(self.hrs, jobs[i], jobs[i].arrival_minute, work_duration)
+                work_start_time = self.low_productive_elves[elves[j].id].next_available_time;
+
+                if jobs[i].arrival_minute > work_start_time:
+                    work_start_time = jobs[i].arrival_minute
+
+                self.low_productive_elves[elves[j].id].next_available_time, work_duration = self.assign_elf_to_toy(work_start_time, self.low_productive_elves[elves[j].id], jobs[i])
+                self.low_productive_elves[elves[j].id].update_elf(self.hrs, jobs[i], work_start_time, work_duration)
             else:
-                self.general_purpose_elves[elves[j].id].next_available_time, work_duration = self.assign_elf_to_toy(jobs[i].arrival_minute, self.general_purpose_elves[elves[j].id], jobs[i])
-                self.general_purpose_elves[elves[j].id].update_elf(self.hrs, jobs[i], jobs[i].arrival_minute, work_duration)
+                work_start_time = self.general_purpose_elves[elves[j].id].next_available_time
+
+                if jobs[i].arrival_minute > work_start_time:
+                    work_start_time = jobs[i].arrival_minute
+
+                self.general_purpose_elves[elves[j].id].next_available_time, work_duration = self.assign_elf_to_toy(work_start_time, self.general_purpose_elves[elves[j].id], jobs[i])
+                self.general_purpose_elves[elves[j].id].update_elf(self.hrs, jobs[i], work_start_time, work_duration)
 
 
 
             # write to file in correct format
-            tt = self.ref_time + datetime.timedelta(seconds=60*jobs[i].arrival_minute)
+            tt = self.ref_time + datetime.timedelta(seconds=60*work_start_time)
             time_string = " ".join([str(tt.year), str(tt.month), str(tt.day), str(tt.hour), str(tt.minute)])
             self.temp_output.append( ( str(jobs[i].id) , str(elves[j].id), str(time_string), str(work_duration) ) );
 
@@ -159,12 +169,14 @@ class Santas_lab(object):
         current_toy_index   = 0;
         unassigned_old_toys = dict() #Toys which have already arrived but not assigned
 
+        minute_alpha        = 5; #Look ahead parameter for greedy search
+
         for day in range(0, self.no_of_days+1):
             
             #Get all the toys which have arrived before today and haven't been assigned
             day_to_minute  = day * 24 * 60;
 
-            for minute in range(day_to_minute+self.hrs.day_start, day_to_minute+self.hrs.day_end):
+            for minute in xrange(day_to_minute+self.hrs.day_start, day_to_minute+self.hrs.day_end, minute_alpha):
                 #Find out all the elves which are available
                 candidate_gp_elves = [self.general_purpose_elves[elf_id] for elf_id in self.general_purpose_elves.keys() if self.general_purpose_elves[elf_id].next_available_time <= minute];
                 candidate_lp_elves = [self.low_productive_elves[elf_id]  for elf_id in self.low_productive_elves.keys()  if self.low_productive_elves[elf_id].next_available_time <= minute];
@@ -174,27 +186,24 @@ class Santas_lab(object):
 
 
                 #Get list of new toys which have arrived uptil this minute
-                new_toys = dict()
                 while current_toy_index < len(self.toys) and self.toys[current_toy_index].arrival_minute <= minute:
-                    new_toys[self.toys[current_toy_index].id] = self.toys[current_toy_index]
+                    unassigned_old_toys[self.toys[current_toy_index].id] = self.toys[current_toy_index]
                     current_toy_index += 1;
 
 
-                candidate_toys  = dict(unassigned_old_toys, **new_toys)
+
 
                 #Call the desired allocation strategy based on the phase
                 if day <= self.preRampUpPhase_threshold:
-                    completed_job_ids  = self.allocate_preRampUpPhase(candidate_toys, candidate_gp_elves, candidate_lp_elves);
+                    completed_job_ids  = self.allocate_preRampUpPhase(unassigned_old_toys, candidate_gp_elves, candidate_lp_elves);
                 else:
-                    completed_job_ids  = self.allocate_RampUpPhase(candidate_toys, candidate_gp_elves, 1, candidate_lp_elves);
+                    completed_job_ids  = self.allocate_RampUpPhase(unassigned_old_toys, candidate_gp_elves, 1, candidate_lp_elves);
 
 
                 #Update the dict
                 for id in completed_job_ids:
-                    del candidate_toys[id]
+                    del unassigned_old_toys[id]
 
-                #Reassign
-                unassigned_old_toys = candidate_toys;
 
 
         #Add any remaining toys
@@ -202,11 +211,13 @@ class Santas_lab(object):
             unassigned_old_toys[self.toys[current_toy_index].id] = self.toys[current_toy_index]
             current_toy_index += 1;
 
+
+
         #If toys remaining beyond the last day
         while unassigned_old_toys:
 
             day_to_minute  = day * 24 * 60;
-            for minute in range(day_to_minute+self.hrs.day_start, day_to_minute+self.hrs.day_end):
+            for minute in xrange(day_to_minute+self.hrs.day_start, day_to_minute+self.hrs.day_end, minute_alpha):
 
 
                 if unassigned_old_toys:

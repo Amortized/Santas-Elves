@@ -58,7 +58,7 @@ def score_submission(sub_file, myToys, hrs, NUM_ELVES):
             if row_count % 50000 == 0:
                 print 'Starting toy: {0}'.format(row_count)
 
-            current_toy = row[0] 
+            current_toy = int(row[0])
             current_elf = int(row[1])
             start_minute = hrs.convert_to_minute(row[2])
             duration = int(row[3])
@@ -102,12 +102,9 @@ def score_submission(sub_file, myToys, hrs, NUM_ELVES):
            # Since toy started on time and is complete, update elf productivity
             myElves[current_elf].update_elf(hrs, myToys[current_toy], start_minute, duration)
 
+
     if len(complete_toys) != len(myToys):
         print "\n ** Not all toys are complete. Exiting."
-        exit(-1)
-    if max(complete_toys) != NUM_TOYS:
-        print "\n ** max ToyId != NUM_TOYS."
-        print "\n   max(complete_toys) = {0} versus NUM_TOYS = {1}".format(max(complete_toys), NUM_TOYS)
         exit(-1)
     else:
         score = last_minute * math.log(1.0 + len(myElves))
@@ -126,11 +123,11 @@ if __name__ == '__main__':
     NUM_TOYS = 10000000
     NUM_ELVES = 900
 
-    toy_file = os.path.join(os.getcwd(), 'toys_rev2.csv')
+    toy_file = os.path.join(os.getcwd(), 'data/toys_rev2.csv')
     myToys = read_toys(toy_file, NUM_TOYS)
     print ' -- All toys read. Starting to score submission. '
 
-    sub_file = os.path.join(os.getcwd(), 'sampleSubmission_rev2.csv')
+    sub_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev2.csv')
     hrs = Hours()
     score_submission(sub_file, myToys, hrs, NUM_ELVES)
 
