@@ -169,7 +169,7 @@ class Santas_lab(object):
         current_toy_index   = 0;
         unassigned_old_toys = dict() #Toys which have already arrived but not assigned
 
-        minute_alpha        = 20; #Look ahead parameter for greedy search
+        minute_alpha        = 120; #Look ahead parameter for greedy search
 
         for day in range(0, self.no_of_days+1):
             
@@ -212,7 +212,7 @@ class Santas_lab(object):
             current_toy_index += 1;
 
 
-
+        minute_alpha = 240; #Go faster
         #If toys remaining beyond the last day
         while unassigned_old_toys:
 
