@@ -169,7 +169,7 @@ class Santas_lab(object):
         current_toy_index   = 0;
         unassigned_old_toys = dict() #Toys which have already arrived but not assigned
 
-        minute_alpha        = 5; #Look ahead parameter for greedy search
+        minute_alpha        = 20; #Look ahead parameter for greedy search
 
         for day in range(0, self.no_of_days+1):
             
@@ -223,7 +223,9 @@ class Santas_lab(object):
                 if unassigned_old_toys:
                    #Use all the general purpose elves
                    candidate_gp_elves = [self.general_purpose_elves[elf_id] for elf_id in self.general_purpose_elves.keys() if self.general_purpose_elves[elf_id].next_available_time <= minute];
-                   completed_job_ids  = self.allocate_RampUpPhase(unassigned_old_toys, candidate_gp_elves, 0, None);
+                   candidate_lp_elves = [self.low_productive_elves[elf_id]  for elf_id in self.low_productive_elves.keys()  if self.low_productive_elves[elf_id].next_available_time <= minute];
+
+                   completed_job_ids  = self.allocate_RampUpPhase(unassigned_old_toys, candidate_gp_elves, 1, candidate_lp_elves);
 
                    if day % 10 == 0 and minute == (day_to_minute+self.hrs.day_start):
                        print("Working on day : " + str(day) + " Unassigned Toys : " + str(len(unassigned_old_toys.keys())) + " GP Elves : " +str(len(candidate_gp_elves)))
