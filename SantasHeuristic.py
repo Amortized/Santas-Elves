@@ -14,6 +14,8 @@ from elf import Elf
 import numpy as np;
 from intervaltree import Interval, IntervalTree;
 from random import shuffle;
+from random import randint;
+import random;
 
 class Santas_lab(object):
     def __init__(self, NUM_ELVES, toy_file, soln_file):
@@ -53,7 +55,7 @@ class Santas_lab(object):
         #Create baskets of toys where the granularity of log(duration) = 0.01
         toy_baskets = IntervalTree();
         i = 0;
-        duration_log_granularity = 0.00005;
+        duration_log_granularity = 0.0005;
         while i <= self.max_duration_log:
             toy_baskets[i: (i+duration_log_granularity)] = [] # A list of toys
             i += duration_log_granularity;
@@ -67,7 +69,7 @@ class Santas_lab(object):
            duration_interval = list(toy_baskets.search(duration_log))[0];
            #Remove the current interval and reinsert with updated count -- HACK
            toy_baskets.remove(duration_interval);
-           toy_baskets[duration_interval.begin:duration_interval.end] = duration_interval.data + [(toy.id, toy.duration)];
+           toy_baskets[duration_interval.begin:duration_interval.end] = duration_interval.data + [(toy)];
 
         return toy_baskets;
 
@@ -85,23 +87,118 @@ class Santas_lab(object):
                 current_elf_id += 1;
                 if current_elf_id > self.NUM_ELVES:
                     current_elf_id = 1;
+        
+    
+    def assign_elf_to_toy(self, input_time, current_elf, current_toy, hrs):
+        """ Given a toy, assigns the next elf to the toy. Computes the elf's updated rating,
+        applies the rest period (if any), and sets the next available time.
+        :param input_time: list of tuples (next_available_time, elf)
+        :param current_elf: elf object
+        :param current_toy: toy object
+        :param hrs: hours object
+        :return: list of elves in order of next available
+        """
+        start_time = hrs.next_sanctioned_minute(input_time)  # double checks that work starts during sanctioned work hours
+        duration = int(math.ceil(current_toy.duration / current_elf.rating))
+        sanctioned, unsanctioned = hrs.get_sanctioned_breakdown(start_time, duration)
 
+        if unsanctioned == 0:
+            return hrs.next_sanctioned_minute(start_time + duration), duration
+        else:
+            return hrs.apply_resting_period(start_time + duration, unsanctioned), duration    
+                                
+    def P(self,prev_score,next_score,temperature):
+        if next_score > prev_score:
+            return 1.0
+        else:
+            return math.exp( -abs(next_score-prev_score)/temperature );
+            
+            
+    def generate_neighbour(self, toys):
+        start       = 0;
+        end         = len(toys) - 1;
+        #Swap;
+        rand1       = randint(start, end);
+        rand2       = randint(start, end);
+        temp        = toys[rand2];
+        toys[rand2] = toys[rand1];
+        toys[rand1] = temp;
+        return toys;
+    
+    def evaluate(self, elf, toys):
+        #Create a copy of elf
+        copy_elf                     = Elf(elf.id);
+        
+        for current_toy in toys:
+            elf_available_time = copy_elf.next_available_time;
+            work_start_time    = elf_available_time;
+            if current_toy.arrival_minute > elf_available_time:
+                work_start_time = current_toy.arrival_minute;
+                
+            copy_elf.next_available_time, work_duration = \
+                    self.assign_elf_to_toy(work_start_time, copy_elf, current_toy, self.hrs);
+            copy_elf.update_elf(self.hrs, current_toy, work_start_time, work_duration);
+        
+        #Earliest time elf finishes the task.
+        return copy_elf.next_available_time;
+    
+            
+            
+        
+        
+        
+        
+        
+        
+                
+                    
+    def do_simulatedAnnealing(self, elf_id):
+        start_temp       = 1e+01;
+        alpha            = 0.99;
+        end_temp         = 1e-3;
+        
+        no_iterations    = 10000;
+        
+        current_temp     = start_temp;
+        current_toy_list = self.elves[elf_id][1];
+        current_elf      = self.elves[elf_id][0];
+        
+        current_score    = self.evaluate(current_elf, current_toy_list);
+        
+        while current_temp > end_temp:
+            #Generate a list of possible neighbours at this temperature
+            current_itr = 1;
+            while current_itr <= no_iterations:
+                #Genearate a neighbour
+                next_neighbour = self.generate_neighbour(current_toy_list);
+                next_score     = self.evaluate(current_elf, next_neighbour);
+                
+                p = self.P(current_score, next_score, current_temp);
+                if random.random() < p:
+                    #Take the Step
+                    current_toy_list = next_neighbour;
+                    current_score    = next_score;
+                    break;
+                current_itr +=1; 
+            print(" Temp :" + str(current_temp) + "  Score : " +str(current_score))
+            #Decrease the temperature
+            current_temp = current_temp * alpha;
+        
+        for toy in current_toy_list:
+            print(str(toy.id) + "  " + str(toy.duration));
+            
 
-        temp = []
-        for elf in self.elves:
-            avg_duration = 0;
-            for toy in self.elves[elf][1]:
-                avg_duration += toy[1]
-            temp.append(str(avg_duration/float(len(self.elves[elf][1]))))
-        print(temp[1:900])
-
-
-
+        
+        
+        
 
 
     def start_work(self):
         toy_baskets = self.create_toy_baskets();
         self.allocate_baskets_to_elf(toy_baskets);
+        self.do_simulatedAnnealing(1);
+        
+        
 
 
 

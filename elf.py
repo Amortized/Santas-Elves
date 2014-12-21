@@ -7,7 +7,7 @@ class Elf:
     def __init__(self, elfid):
         self.id = elfid
         self.rating = 1.0
-        self.next_available_time = 540  # Santa's Workshop opens Jan 1, 2014 9:00 (= 540 minutes)
+        self.next_available_time = 540  + (365 * 1440)# Santa's Workshop opens Jan 1, 2014 9:00 (= 540 minutes)
         self.rating_increase   = 1.02
         self.rating_decrease   = 0.90
         self.no_toys_completed = 0
