@@ -12,36 +12,25 @@ from hours import Hours
 from toy import Toy
 from elf import Elf
 import numpy as np;
+from intervaltree import Interval, IntervalTree;
+from random import shuffle;
 
 class Santas_lab(object):
     def __init__(self, NUM_ELVES, toy_file, soln_file):
         self.hrs = Hours()
         self.NUM_ELVES                = NUM_ELVES;
-        self.LOW_PRODUCTIVE_ELVES     = 10;
-        self.ref_time                 = datetime.datetime(2014, 1, 1, 0, 0)
-        self.big_job_threshold        = 20000 #Big job threasold
-        self.preRampUpPhase_threshold = 100
+        self.ref_time                 = datetime.datetime(2014, 1, 1, 0, 0);
+        self.max_duration_log         = 0;
 
         #Toys sorted based on arrival time
-        self.toys                     = self.read(toy_file)
-        self.no_of_days               = int((self.toys[-1].arrival_minute)  / (24.0 * 60.0));  #No of days uptil which toys arrive
+        self.toys                     = self.read(toy_file);
 
-        #Elves(Divide the elf's into general purpose pool and low-productivity pool)
-        self.general_purpose_elves    = dict()
-        self.low_productive_elves     = dict() #They will do the long tasks
+        self.elves                    = dict(); #elf_id -> (elf Object, list of allocated toys)
+        #Every elf maintains list of toys which it has to optically work on
+        for i in xrange(1, NUM_ELVES+1):
+            elf = Elf(i)
+            self.elves[elf.id]  = (elf, []);
 
-        for i in range(self.LOW_PRODUCTIVE_ELVES+1, self.NUM_ELVES+1):
-            elf = Elf(i)
-            self.general_purpose_elves[elf.id] = elf
-            
-        for i in range(1, self.LOW_PRODUCTIVE_ELVES+1):
-            elf = Elf(i)
-            self.low_productive_elves[elf.id]  = elf;
-            
-        self.output = open(soln_file, "w")
-        self.output.write("ToyId,ElfId,StartTime,Duration" + "\n")
-        self.temp_output = [];
-        
     def read(self, toy_file):
         toys = []
         with open(toy_file, 'rb') as f:
@@ -49,203 +38,82 @@ class Santas_lab(object):
             toysfile.next()  # header row
             
             for row in toysfile:
-                current_toy = Toy(row[0], row[1], row[2])
+                current_toy = Toy(row[0], row[1], row[2]);
+                if math.log(current_toy.duration) > self.max_duration_log:
+                    self.max_duration_log = math.log(current_toy.duration)
                 toys.append(current_toy)
+        return  toys;
                 
-        #Sort the Toy object based on arrival minute
-        return sorted(toys, key=lambda x : x.arrival_minute)
-    
-    def assign_elf_to_toy(self,input_time, current_elf, current_toy):
-        start_time = self.hrs.next_sanctioned_minute(input_time)  # double checks that work starts during sanctioned work hours
-        duration = int(math.ceil(current_toy.duration / current_elf.rating))
-        sanctioned, unsanctioned = self.hrs.get_sanctioned_breakdown(start_time, duration)
-        if unsanctioned == 0:
-            return self.hrs.next_sanctioned_minute(start_time + duration), duration
-        else:
-            return self.hrs.apply_resting_period(start_time + duration, unsanctioned), duration
-        
 
-
-    def allocate_jobs(self, jobs, elves, big_or_nonbig):
-
-        if big_or_nonbig == "big":
-            #Randomly permute
-            np.random.shuffle(jobs)
-            np.random.shuffle(elves)
-
+    def create_toy_baskets(self):
+        '''
+        :Builds toy_baskets where each basket is granularized based on log(duration)
+        :return : Final structure has the ids of the toys belonging to that duration bucket
+        '''
+        #Create baskets of toys where the granularity of log(duration) = 0.01
+        toy_baskets = IntervalTree();
+        i = 0;
+        duration_log_granularity = 0.00005;
+        while i <= self.max_duration_log:
+            toy_baskets[i: (i+duration_log_granularity)] = [] # A list of toys
+            i += duration_log_granularity;
 
         i = 0;
-        j = 0;
-        completed_toys = [];
+        for toy in self.toys:
+           i = i + 1;
+           if i % 10000 == 0:
+               print("Interval search at " + str(i))
+           duration_log      = math.log(toy.duration);
+           duration_interval = list(toy_baskets.search(duration_log))[0];
+           #Remove the current interval and reinsert with updated count -- HACK
+           toy_baskets.remove(duration_interval);
+           toy_baskets[duration_interval.begin:duration_interval.end] = duration_interval.data + [(toy.id, toy.duration)];
 
-        while i < len(jobs) and j < len(elves):
+        return toy_baskets;
 
-            if big_or_nonbig == "big":
-                work_start_time = self.low_productive_elves[elves[j].id].next_available_time;
-
-                if jobs[i].arrival_minute > work_start_time:
-                    work_start_time = jobs[i].arrival_minute
-
-                self.low_productive_elves[elves[j].id].next_available_time, work_duration = self.assign_elf_to_toy(work_start_time, self.low_productive_elves[elves[j].id], jobs[i])
-                self.low_productive_elves[elves[j].id].update_elf(self.hrs, jobs[i], work_start_time, work_duration)
-            else:
-                work_start_time = self.general_purpose_elves[elves[j].id].next_available_time
-
-                if jobs[i].arrival_minute > work_start_time:
-                    work_start_time = jobs[i].arrival_minute
-
-                self.general_purpose_elves[elves[j].id].next_available_time, work_duration = self.assign_elf_to_toy(work_start_time, self.general_purpose_elves[elves[j].id], jobs[i])
-                self.general_purpose_elves[elves[j].id].update_elf(self.hrs, jobs[i], work_start_time, work_duration)
-
-
-
-            # write to file in correct format
-            tt = self.ref_time + datetime.timedelta(seconds=60*work_start_time)
-            time_string = " ".join([str(tt.year), str(tt.month), str(tt.day), str(tt.hour), str(tt.minute)])
-            self.temp_output.append( ( str(jobs[i].id) , str(elves[j].id), str(time_string), str(work_duration) ) );
-
-            #Flushing non periodically to reduce the IO
-            if len(self.temp_output) == 500000:
-                #Flush
-                for dp in self.temp_output:
-                    self.output.write(dp[0] + "," + dp[1] + "," + dp[2] + "," + dp[3] + "\n");
-                del self.temp_output[:];
-
-            #Mark as completed
-            completed_toys.append(jobs[i].id)
-
-            i = i + 1;
-            j = j + 1;
+    def allocate_baskets_to_elf(self, toy_baskets):
+        '''
+        :param toy_baskets: Interval.begin, Interval.end, List of toy_ids
+        :return: allocates toys from various baskets to various elves
+        '''
+        for tb in toy_baskets:
+            toys     = tb.data
+            shuffle(toys); #Shuffle toys
+            current_elf_id = 1;
+            for toy in toys:
+                self.elves[current_elf_id][1].append(toy);
+                current_elf_id += 1;
+                if current_elf_id > self.NUM_ELVES:
+                    current_elf_id = 1;
 
 
-        return completed_toys;
+        temp = []
+        for elf in self.elves:
+            avg_duration = 0;
+            for toy in self.elves[elf][1]:
+                avg_duration += toy[1]
+            temp.append(str(avg_duration/float(len(self.elves[elf][1]))))
+        print(temp[1:900])
 
 
 
 
-    def allocate_preRampUpPhase(self, candidate_toys, candidate_gp_elves, candidate_lp_elves):
-        big_jobs               = [candidate_toys[id] for id in candidate_toys.keys() if candidate_toys[id].duration >= self.big_job_threshold]
-        non_big_jobs           = [candidate_toys[id] for id in candidate_toys.keys() if candidate_toys[id].duration <  self.big_job_threshold]
 
-        #Big jobs
-        completed_big_jobs     = self.allocate_jobs(big_jobs, candidate_lp_elves, "big")
-
-        #For Non Big Jobs - Greedily pick the elf with the lowest rating and assign it to the highest duration toy
-        #Sort the elf based on their rating in asceding order
-        #Sort the toys based on their duration in descending order
-
-        candidate_gp_elves     = sorted(candidate_gp_elves, key=lambda x : x.rating)
-        non_big_jobs           = sorted(non_big_jobs, key=lambda x : x.duration, reverse=True)
-        completed_non_big_jobs = self.allocate_jobs(non_big_jobs, candidate_gp_elves, "nonbig")
-
-        return (completed_big_jobs + completed_non_big_jobs)
-
-
-    def allocate_RampUpPhase(self, candidate_toys, candidate_gp_elves, mode, candidate_lp_elves=None):
-        if mode == 1:
-            big_jobs               = [candidate_toys[id] for id in candidate_toys.keys() if candidate_toys[id].duration >= self.big_job_threshold]
-            non_big_jobs           = [candidate_toys[id] for id in candidate_toys.keys() if candidate_toys[id].duration <  self.big_job_threshold]
-
-            #Big jobs
-            completed_big_jobs     = self.allocate_jobs(big_jobs, candidate_lp_elves, "big")
-            #For Non Big Jobs - Greedily pick the highest rating elf for the highest duration toy
-            candidate_gp_elves     = sorted(candidate_gp_elves, key=lambda x : x.rating, reverse=True)
-            non_big_jobs           = sorted(non_big_jobs, key=lambda x : x.duration, reverse=True)
-            completed_non_big_jobs = self.allocate_jobs(non_big_jobs, candidate_gp_elves, "nonbig")
-
-            return (completed_big_jobs + completed_non_big_jobs)
-        else:
-            candidate_toys         = [candidate_toys[id] for id in candidate_toys.keys()]
-            candidate_gp_elves     = sorted(candidate_gp_elves, key=lambda x : x.rating, reverse=True)
-            candidate_toys         = sorted(candidate_toys, key=lambda x : x.duration, reverse=True)
-            completed_jobs         = self.allocate_jobs(candidate_toys, candidate_gp_elves, "nonbig")
-
-            return  completed_jobs
+    def start_work(self):
+        toy_baskets = self.create_toy_baskets();
+        self.allocate_baskets_to_elf(toy_baskets);
 
 
 
 
-    def allocate(self):
-        current_toy_index   = 0;
-        unassigned_old_toys = dict() #Toys which have already arrived but not assigned
-
-        minute_alpha        = 299; #Look ahead parameter for greedy search
-
-        for day in range(0, self.no_of_days+1):
-            
-            #Get all the toys which have arrived before today and haven't been assigned
-            day_to_minute  = day * 24 * 60;
-
-            for minute in xrange(day_to_minute+self.hrs.day_start, day_to_minute+self.hrs.day_end, minute_alpha):
-                #Find out all the elves which are available
-                candidate_gp_elves = [self.general_purpose_elves[elf_id] for elf_id in self.general_purpose_elves.keys() if self.general_purpose_elves[elf_id].next_available_time <= minute];
-                candidate_lp_elves = [self.low_productive_elves[elf_id]  for elf_id in self.low_productive_elves.keys()  if self.low_productive_elves[elf_id].next_available_time <= minute];
-
-                if day % 10 == 0 and minute == (day_to_minute+self.hrs.day_start):
-                    print("Working on day : " + str(day) + " Unassigned Toys : " + str(len(unassigned_old_toys.keys())) + " GP Elves : " +str(len(candidate_gp_elves)) + " LP Elves : " + str(len(candidate_lp_elves)))
-
-
-                #Get list of new toys which have arrived uptil this minute
-                while current_toy_index < len(self.toys) and self.toys[current_toy_index].arrival_minute <= minute:
-                    unassigned_old_toys[self.toys[current_toy_index].id] = self.toys[current_toy_index]
-                    current_toy_index += 1;
 
 
 
 
-                #Call the desired allocation strategy based on the phase
-                if day <= self.preRampUpPhase_threshold:
-                    completed_job_ids  = self.allocate_preRampUpPhase(unassigned_old_toys, candidate_gp_elves, candidate_lp_elves);
-                else:
-                    completed_job_ids  = self.allocate_RampUpPhase(unassigned_old_toys, candidate_gp_elves, 1, candidate_lp_elves);
-
-
-                #Update the dict
-                for id in completed_job_ids:
-                    del unassigned_old_toys[id]
 
 
 
-        #Add any remaining toys
-        while current_toy_index < len(self.toys):
-            unassigned_old_toys[self.toys[current_toy_index].id] = self.toys[current_toy_index]
-            current_toy_index += 1;
 
-
-        minute_alpha = 400; #Go faster
-        #If toys remaining beyond the last day
-        while unassigned_old_toys:
-
-            day_to_minute  = day * 24 * 60;
-            for minute in xrange(day_to_minute+self.hrs.day_start, day_to_minute+self.hrs.day_end, minute_alpha):
-
-
-                if unassigned_old_toys:
-                   #Use all the general purpose elves
-                   candidate_gp_elves = [self.general_purpose_elves[elf_id] for elf_id in self.general_purpose_elves.keys() if self.general_purpose_elves[elf_id].next_available_time <= minute];
-                   candidate_lp_elves = [self.low_productive_elves[elf_id]  for elf_id in self.low_productive_elves.keys()  if self.low_productive_elves[elf_id].next_available_time <= minute];
-
-                   completed_job_ids  = self.allocate_RampUpPhase(unassigned_old_toys, candidate_gp_elves, 1, candidate_lp_elves);
-
-                   if day % 10 == 0 and minute == (day_to_minute+self.hrs.day_start):
-                       print("Working on day : " + str(day) + " Unassigned Toys : " + str(len(unassigned_old_toys.keys())) + " GP Elves : " +str(len(candidate_gp_elves)))
-
-                   #Update the dict
-                   for id in completed_job_ids:
-                       del unassigned_old_toys[id]
-
-                else:
-                    break;
-            #Next day
-            day = day + 1;
-
-        #Flush the remaining
-        for dp in self.temp_output:
-            self.output.write(dp[0] + "," + dp[1] + "," + dp[2] + "," + dp[3] + "\n");
-
-        print("Working on day : " + str(day) + " Remaining Toys : " + str(len(unassigned_old_toys.keys())))
-        #Close the file
-        self.output.close();
                                     
             
 
@@ -257,9 +125,10 @@ if __name__ == '__main__':
     start = time.time()
 
     NUM_ELVES = 900;
-    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
+    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev22_.csv');
     soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev2.csv')
     santa     = Santas_lab(NUM_ELVES, toy_file, soln_file)
-    santa.allocate();
+    santa.start_work()
+
     print 'total runtime = {0}'.format(time.time() - start)
     
