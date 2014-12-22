@@ -171,9 +171,9 @@ class Santas_lab(object):
 
         if obj == 0:
             #TO DO ; This need to be changed according to the objective function 
-            start_temp   = 1e+4;
+            start_temp   = 1e+30;
             end_temp     = 1e+3;
-            alpha        = 0.20;
+            alpha        = 0.95;
         else:
             start_temp   = 400;
             end_temp     = 0.10;
@@ -195,14 +195,14 @@ class Santas_lab(object):
         prev_elf.no_toys_completed   = current_elf.no_toys_completed;
 
 
-        processed_elf                = self.evaluate(current_elf, current_toy_list);
-        current_elf                  = processed_elf; #Update elf as the first solution is always accepted
+        processed_elf_prev           = self.evaluate(current_elf, current_toy_list);
+
 
         #Initialize to starting solution
         if obj == 0:
-            overall_best_obj = current_elf.next_available_time;
+            overall_best_obj = processed_elf_prev.next_available_time;
         else:
-            overall_best_obj = current_elf.rating;
+            overall_best_obj = processed_elf_prev.rating;
         overall_best_toy_list = current_toy_list;
 
         while current_temp > end_temp:
@@ -214,37 +214,37 @@ class Santas_lab(object):
                     break;
                 
                 #Genearate a neighbour
-                next_neighbour    = self.generate_neighbour(current_toy_list);
-                processed_elf     = self.evaluate(current_elf, next_neighbour);
+                next_neighbour            = self.generate_neighbour(current_toy_list);
+                processed_elf_current     = self.evaluate(current_elf, next_neighbour);
 
                 if obj == 0:
-                    p = self.objective_earliest_completion(current_elf.next_available_time, processed_elf.next_available_time, current_temp);
+                    p = self.objective_earliest_completion(processed_elf_current.next_available_time, processed_elf_prev.next_available_time, current_temp);
 
                 else:
-                    p = self.objective_increase_health(current_elf.rating, processed_elf.rating, current_temp);
+                    p = self.objective_increase_health(processed_elf_current.rating, processed_elf_prev.rating, current_temp);
 
                 
                 if random.random() < p:
                     #Take the Step
-                    current_toy_list = next_neighbour;
-                    current_elf      = processed_elf;
+                    current_toy_list        = next_neighbour;
+                    processed_elf_prev      = processed_elf_current;
+                    print("P : " + str(p))
 
                     #Update if the new global minima is found
                     if obj == 0:
-                        if current_elf.next_available_time < overall_best_obj:
-                            overall_best_obj = current_elf.next_available_time;
+                        if processed_elf_prev.next_available_time < overall_best_obj:
+                            overall_best_obj = processed_elf_prev.next_available_time;
                             overall_best_toy_list = next_neighbour;
                     else:
-                        print("P : " + str(p))
-                        if current_elf.rating > overall_best_obj:
-                            overall_best_obj = current_elf.rating;
+                        if processed_elf_prev.rating > overall_best_obj:
+                            overall_best_obj = processed_elf_prev.rating;
                             overall_best_toy_list = next_neighbour;
                     ################### 
                     break;
             if obj == 0:
-                print( "Elf : " + str(current_elf.id) + " Temp :" + str(current_temp) + "  Completion Time : " +str(current_elf.next_available_time) +"\n")
+                print( "Elf : " + str(processed_elf_prev.id) + " Temp :" + str(current_temp) + "  Completion Time : " +str(processed_elf_prev.next_available_time) +"\n")
             else:
-                print( "Elf : " + str(current_elf.id) + " Temp :" + str(current_temp) + "  Rating : " +str(current_elf.rating) +"\n")
+                print( "Elf : " + str(processed_elf_prev.id) + " Temp :" + str(current_temp) + "  Rating : " +str(processed_elf_prev.rating) +"\n")
                     
             #Decrease the temperature
             current_temp = current_temp * alpha;
@@ -291,7 +291,7 @@ class Santas_lab(object):
         self.allocate_baskets_to_elf();
 
         ''' This needs to be parallelized across cores '''  
-        for elf_id in xrange(1, self.NUM_ELVES+1):
+        for elf_id in xrange(1, NUM_ELVES+1):
             self.optimize_elf(elf_id);
 
     def write(self, elf_id, fh):
