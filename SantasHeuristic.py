@@ -16,23 +16,38 @@ from random import shuffle;
 from random import randint;
 import random;
 import pickle;
+import sys;
+
 
 class Santas_lab(object):
-    def __init__(self, NUM_ELVES, toy_file):
-        self.hrs = Hours()
+    def __init__(self, NUM_ELVES, toy_file=None, allocated=False, elf_id=None):
+        self.hrs                      = Hours()
         self.NUM_ELVES                = NUM_ELVES;
         self.ref_time                 = datetime.datetime(2014, 1, 1, 0, 0);
         self.toy_baskets              = dict();
         self.max_duration_log         = 11.0;  #Predetermined from analysis
-
-        #Toys sorted based on arrival time
-        self.create_toy_baskets(toy_file);
-
         self.elves                    = dict(); #elf_id -> (elf Object, list of allocated toys, optimimum toy workflow)
-        #Every elf maintains list of toys which it has to optically work on
-        for i in xrange(1, NUM_ELVES+1):
-            elf = Elf(i)
+
+        if allocated == False:
+           #Toys haven't been sorted. Need to assign toys to elf. 
+           #Toys sorted based on arrival time
+           self.create_toy_baskets(toy_file);
+
+           #Every elf maintains list of toys which it has to optically work on
+           for i in xrange(1, NUM_ELVES+1):
+              elf = Elf(i)
+              self.elves[elf.id]  = (elf, [], []);
+        else:
+            #Allocation has been done, just create the elf and respective toy objects
+            elf   = Elf(elf_id);
             self.elves[elf.id]  = (elf, [], []);
+            with open(toy_file, 'rb') as f:
+                toysfile = csv.reader(f)
+                toysfile.next()  # header row
+                for row in toysfile:
+                    current_toy       = Toy(row[0], row[1], row[2]);
+                    self.elves[elf_id][1].append(current_toy);
+
 
 
 
@@ -85,6 +100,9 @@ class Santas_lab(object):
             #For remaining toys, randomly pick an elf and assign
             for i in range((toys_per_elf*self.NUM_ELVES), len(toys)):
                 self.elves[randint(1, self.NUM_ELVES)][1].append(toys[i]);
+        
+
+
 
 
     def assign_elf_to_toy(self, input_time, current_elf, current_toy, hrs):
@@ -156,14 +174,6 @@ class Santas_lab(object):
         #Earliest time elf finishes the task.
         return copy_elf;
     
-            
-            
-        
-        
-        
-        
-        
-        
                 
                     
     def do_simulatedAnnealing(self, current_toy_list, current_elf, obj):
@@ -289,13 +299,21 @@ class Santas_lab(object):
             else:
                 obj = 0;
 
+    def dumpAllocations(self):
+        '''
+          Dumps allocations for all the toys into their respective files
+        '''
+        for i in xrange(1, self.NUM_ELVES+1):
+            file_name = "data/" + str(i) + "_allocation.csv";
+            fh        = open(file_name, "w");
+            fh.write('ToyId,Arrival,Duration\n');
 
-    def start_work(self):
-        self.allocate_baskets_to_elf();
+            #Write the Toys
+            for toy in self.elves[i][1]:
+               fh.write(str(toy.id) +"," + str(toy.arrival) + "," + str(toy.duration) + "\n");
+            fh.close();
 
-        ''' This needs to be parallelized across cores '''  
-        for elf_id in xrange(1, 2):
-            self.optimize_elf(elf_id);
+
 
     def write(self, elf_id, fh):
         current_elf         = self.elves[elf_id][0];
@@ -308,21 +326,30 @@ class Santas_lab(object):
 # === MAIN === #
 
 if __name__ == '__main__':
+    args  = list(sys.argv[1:]);
 
-    start = time.time()
-
+    start = time.time();
     NUM_ELVES = 900;
-    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
-    soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev22.csv')
-    santa     = Santas_lab(NUM_ELVES, toy_file);
-    santa.start_work()
-
-    fh           = open(soln_file, "w");
-    fh.write('ToyId,ElfId,StartTime,Duration\n');
-    for elf_id in xrange(1, NUM_ELVES+1):
-        santa.write(elf_id, fh);
-    fh.close();
-
-
-    print 'total runtime = {0}'.format(time.time() - start)
     
+    soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev22.csv');
+
+    if int(args[0]) == 1:
+        #Construct workflows for toys and dump them
+        toy_file  = os.path.join(os.getcwd(), 'data/toys_rev22.csv');
+        santa     = Santas_lab(NUM_ELVES, toy_file);
+        santa.allocate_baskets_to_elf();
+        santa.dumpAllocations();
+    elif int(args[0]) == 2:
+        #Optimize the workflow of the given elf.
+        elf_id    = int(args[1]);
+        toy_file  = args[2];
+        santa     = Santas_lab(NUM_ELVES, toy_file, True, elf_id);
+        santa.optimize_elf(elf_id);
+        file_name = "data/" + str(elf_id) + "_ans.csv";
+        fh        = open(file_name, "w");
+        fh.write('ToyId,ElfId,StartTime,Duration\n');
+        santa.write(elf_id,fh);
+        fh.close();
+        
+    print 'total runtime = {0}'.format(time.time() - start);
+

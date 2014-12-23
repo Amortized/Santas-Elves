@@ -6,6 +6,7 @@ class Toy:
     def __init__(self, toyid, arrival, duration):
         self.reference_start_time = datetime.datetime(2014, 1, 1, 0, 0)  # set when elf starts working on toy
         self.id = int(toyid)
+        self.arrival = arrival;
         self.arrival_minute = Hours.convert_to_minute(arrival)
         self.duration = int(duration)
         self.completed_minute = 0
