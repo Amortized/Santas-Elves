@@ -15,7 +15,7 @@ import numpy as np;
 from random import shuffle;
 from random import randint;
 import random;
-
+import pickle;
 
 class Santas_lab(object):
     def __init__(self, NUM_ELVES, toy_file):
@@ -171,13 +171,13 @@ class Santas_lab(object):
 
         if obj == 0:
             #TO DO ; This need to be changed according to the objective function 
-            start_temp   = 1e+30;
-            end_temp     = 1e+3;
-            alpha        = 0.95;
+            start_temp   = 1e+10;
+            end_temp     = 1e-2;
+            alpha        = 0.60;
         else:
-            start_temp   = 400;
-            end_temp     = 0.10;
-            alpha        = 0.90;   
+            start_temp   = 1e+10;
+            end_temp     = 1e-2;
+            alpha        = 0.60;
 
 
 
@@ -228,7 +228,6 @@ class Santas_lab(object):
                     #Take the Step
                     current_toy_list        = next_neighbour;
                     processed_elf_prev      = processed_elf_current;
-                    print("P : " + str(p))
 
                     #Update if the new global minima is found
                     if obj == 0:
@@ -242,9 +241,11 @@ class Santas_lab(object):
                     ################### 
                     break;
             if obj == 0:
-                print( "Elf : " + str(processed_elf_prev.id) + " Temp :" + str(current_temp) + "  Completion Time : " +str(processed_elf_prev.next_available_time) +"\n")
+                #print( "Elf : " + str(processed_elf_prev.id) + " Temp :" + str(current_temp) + "  Completion Time : " +str(processed_elf_prev.next_available_time) +"\n")
+                pass;
             else:
-                print( "Elf : " + str(processed_elf_prev.id) + " Temp :" + str(current_temp) + "  Rating : " +str(processed_elf_prev.rating) +"\n")
+                #print( "Elf : " + str(processed_elf_prev.id) + " Temp :" + str(current_temp) + "  Rating : " +str(processed_elf_prev.rating) +"\n")
+                pass;
                     
             #Decrease the temperature
             current_temp = current_temp * alpha;
@@ -252,11 +253,11 @@ class Santas_lab(object):
         if obj == 0:
             if overall_best_obj > current_elf.next_available_time:
                 overall_best_toy_list = current_toy_list;
-            print( "Elf : " + str(current_elf.id) + " Temp :" + str(current_temp) + "  Overall Completion Time : " +str(overall_best_obj) + "\n")
+            #print( "Elf : " + str(current_elf.id) + " Temp :" + str(current_temp) + "  Overall Completion Time : " +str(overall_best_obj) + "\n")
         else:
             if overall_best_obj < current_elf.rating:
                 overall_best_toy_list = current_toy_list;
-            print( "Elf : " + str(current_elf.id) + " Temp :" + str(current_temp) + " Overall Rating : " +str(overall_best_obj) + "\n")
+            #print( "Elf : " + str(current_elf.id) + " Temp :" + str(current_temp) + " Overall Rating : " +str(overall_best_obj) + "\n")
 
         #Now, that best ordering is found out; exceute it on the elf
         return self.evaluate(prev_elf, overall_best_toy_list) , overall_best_toy_list;
@@ -264,7 +265,7 @@ class Santas_lab(object):
     def optimize_elf(self, elf_id):
         toy_list         = self.elves[elf_id][1];
         current_elf      = self.elves[elf_id][0];
-        toy_batch_sz     = 50;
+        toy_batch_sz     = 20;
         counter          = 0;
         obj              = 0; #Possible values 0 - decreased completion time, 1 - increase health
 
@@ -275,6 +276,8 @@ class Santas_lab(object):
             current_toy_list                   = toy_list[counter:(counter+toy_batch_sz)];
             current_elf, optimum_toy_list      = self.do_simulatedAnnealing(current_toy_list, current_elf, obj);
             counter                           += toy_batch_sz;
+
+            print("Batch :"  + str(counter/toy_batch_sz))
 
             #Add the optimum toy_list in that order
             for ot in optimum_toy_list:
@@ -291,7 +294,7 @@ class Santas_lab(object):
         self.allocate_baskets_to_elf();
 
         ''' This needs to be parallelized across cores '''  
-        for elf_id in xrange(1, NUM_ELVES+1):
+        for elf_id in xrange(1, 2):
             self.optimize_elf(elf_id);
 
     def write(self, elf_id, fh):
@@ -311,7 +314,7 @@ if __name__ == '__main__':
     NUM_ELVES = 900;
     toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
     soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev22.csv')
-    santa     = Santas_lab(NUM_ELVES, toy_file)
+    santa     = Santas_lab(NUM_ELVES, toy_file);
     santa.start_work()
 
     fh           = open(soln_file, "w");
