@@ -17,10 +17,12 @@ from random import randint;
 import random;
 import pickle;
 import sys;
-
+import time;
 
 class Santas_lab(object):
-    def __init__(self, NUM_ELVES, toy_file):
+    def __init__(self, NUM_ELVES, toy_file, soln_file):
+        #Output file
+        self.output                   = open(soln_file, "w");
         self.hrs                      = Hours()
         self.NUM_ELVES                = NUM_ELVES;
         self.ref_time                 = datetime.datetime(2014, 1, 1, 0, 0);
@@ -34,6 +36,8 @@ class Santas_lab(object):
         for i in xrange(1, NUM_ELVES+1):
             elf = Elf(i);
             self.elves[elf.id]  = (elf, dict(), dict(), dict());
+
+        self.temp_earlier = 0;
 
 
 
@@ -96,6 +100,7 @@ class Santas_lab(object):
             for i in range((toys_per_elf*self.NUM_ELVES), len(toys)):
                 random_toy = randint(1, self.NUM_ELVES);
                 self.elves[random_toy][1][toys[i][0]] = toys[i][1];
+                self.elves[random_toy][2][int(toys[i][1]/60.0)][0] += 1;
                 self.elves[random_toy][2][int(toys[i][1]/60.0)][1].append(toys[i][0])
 
 
@@ -127,50 +132,33 @@ class Santas_lab(object):
             self.assign_elf_to_toy(work_start_time, self.elves[elf_id][0], self.elves[elf_id][1][toy_id], self.hrs);
         self.elves[elf_id][0].update_elf(self.hrs, Toy(toy_id, '2014 01 01 01 01' ,self.elves[elf_id][1][toy_id]), work_start_time, work_duration);
 
+ 
         tt = self.ref_time + datetime.timedelta(seconds=60*work_start_time)
         time_string = " ".join([str(tt.year), str(tt.month), str(tt.day), str(tt.hour), str(tt.minute)])
 
-        if toy_id in self.elves[elf_id][3]:
-            print("Duplicate");
-            print(toy_id)
-            print(self.elves[elf_id][3])
-            exit(1);
+        if tt.year > self.temp_earlier:
+            self.temp_earlier = tt.year;
+
         self.elves[elf_id][3][toy_id] = (elf_id, time_string, work_duration);
 
 
     def optimize(self):
+        self.output.write("ToyId,ElfId,StartTime,Duration\n");
+
         #Toys less than folling counter are used to boost productivity
         boost_productive_worker = 24;
         #Rating thresold
         rating_thresold = 0.30;
 
-
-
-        prev = 0;
-
-        for i in xrange(1,2):
+        for i in xrange(1, 2):
+            print("Optimizing : Elf " + str(i)  );
             no_completed_toys = 0;
             #Current expensive toy counter
             exp_toy_counter = max(self.elves[i][2].keys());
             while no_completed_toys < len(self.elves[i][1]):
-                print(" No of Completed Toys " + str(no_completed_toys))
-                print(" No of Total Toys "     + str(len(self.elves[i][1].keys())))
-                print(" No of Inserted Toys "  + str(len(self.elves[i][3].keys())))
-                if prev >= 9100:
-                    for k in self.elves[i][2]:
-                        for z in self.elves[i][2][k][1]:
-                            if z in self.elves[i][3]:
-                                pass;
-                            else:
-                                print(z)
-                                print(k)
-                                print(exp_toy_counter)
-                                print(self.elves[i][2][exp_toy_counter][0])
-                                break;
-
                 #Play a expensive toy
                 while exp_toy_counter > boost_productive_worker and self.elves[i][2][exp_toy_counter][0] == 0:
-                    exp_toy_counter -= 1;
+                    exp_toy_counter -= 1;                    
 
 
                 if exp_toy_counter > boost_productive_worker:
@@ -183,9 +171,7 @@ class Santas_lab(object):
                         else:
                             #Play this elf
                             self.play_elf(i, toy_id);
-                            prev = no_completed_toys
                             no_completed_toys += 1;
-
                             break;
 
                 toys = [];
@@ -201,16 +187,26 @@ class Santas_lab(object):
                       break;
                   #Generate a random toy
                   toy_id             = toys[randint(0, len(toys)-1)];
-                  prev = no_completed_toys
                   no_completed_toys += 1;
 
                   self.play_elf(i, toy_id)
                   #Remove the toy
                   toys.remove(toy_id);
 
+            #Flush the output of this elf to file
+            for toy_id in self.elves[i][3]:
+                self.output.write(  str(toy_id) + "," + \
+                               str(self.elves[i][3][toy_id][0]) + "," \
+                             + str(self.elves[i][3][toy_id][1]) + "," \
+                             + str(self.elves[i][3][toy_id][2]) + "\n" \
+                            );
+            #Remove memory footprint
+            self.elves[i] = None;
 
-        print(self.elves[1][3])
 
+
+        self.output.close();
+        print(self.temp_earlier)  
 
 
 
@@ -228,9 +224,9 @@ if __name__ == '__main__':
     start = time.time();
     NUM_ELVES = 900;
     #Construct workflows for toys and dump them
-    soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev22.csv');
+    soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev2.csv');
     toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
-    santa     = Santas_lab(NUM_ELVES, toy_file);
+    santa     = Santas_lab(NUM_ELVES, toy_file, soln_file);
     santa.allocate_baskets_to_elf();
     santa.optimize()
 
