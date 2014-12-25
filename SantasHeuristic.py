@@ -20,7 +20,7 @@ import sys;
 
 
 class Santas_lab(object):
-    def __init__(self, NUM_ELVES, toy_file=None, allocated=False, elf_id=None):
+    def __init__(self, NUM_ELVES, toy_file):
         self.hrs                      = Hours()
         self.NUM_ELVES                = NUM_ELVES;
         self.ref_time                 = datetime.datetime(2014, 1, 1, 0, 0);
@@ -28,25 +28,12 @@ class Santas_lab(object):
         self.max_duration_log         = 11.0;  #Predetermined from analysis
         self.elves                    = dict(); #elf_id -> (elf Object, list of allocated toys, optimimum toy workflow)
 
-        if allocated == False:
-           #Toys haven't been sorted. Need to assign toys to elf. 
-           #Toys sorted based on arrival time
-           self.create_toy_baskets(toy_file);
+        self.create_toy_baskets(toy_file)
 
-           #Every elf maintains list of toys which it has to optically work on
-           for i in xrange(1, NUM_ELVES+1):
-              elf = Elf(i)
-              self.elves[elf.id]  = (elf, [], []);
-        else:
-            #Allocation has been done, just create the elf and respective toy objects
-            elf   = Elf(elf_id);
-            self.elves[elf.id]  = (elf, [], []);
-            with open(toy_file, 'rb') as f:
-                toysfile = csv.reader(f)
-                toysfile.next()  # header row
-                for row in toysfile:
-                    current_toy       = Toy(row[0], row[1], row[2]);
-                    self.elves[elf_id][1].append(current_toy);
+        #Every elf maintains list of toys which it has to optically work on
+        for i in xrange(1, NUM_ELVES+1):
+            elf = Elf(i);
+            self.elves[elf.id]  = (elf, dict(), dict(), dict());
 
 
 
@@ -73,9 +60,9 @@ class Santas_lab(object):
               i = i + 1;
               if i % 10000 == 0:
                   print("Reading # " + str(i))
-              current_toy       = Toy(row[0], row[1], row[2]);
+              current_toy       = ( int(row[0]), float(row[2]) );
               #Find the right bucket no
-              bucket                   = 1 + int(round(math.log(current_toy.duration), 4) / duration_log_granularity); #Rounded to log_granularity decimal places
+              bucket                   = 1 + int(round(math.log(current_toy[1]), 4) / duration_log_granularity); #Rounded to log_granularity decimal places
               self.toy_baskets[bucket].append(current_toy);
 
 
@@ -85,6 +72,11 @@ class Santas_lab(object):
         '''
         :return: allocates toys from various baskets to various elves
         '''
+        #Initialize the hour map maintained by each elf
+        for i in xrange(1, self.NUM_ELVES+1):
+            for hr in xrange(0, 1000):
+                self.elves[i][2][hr] = [0, []];
+
         for bucket in self.toy_baskets:
             toys  = self.toy_baskets[bucket]
             shuffle(toys); #Shuffle toys
@@ -92,20 +84,25 @@ class Santas_lab(object):
 
             current_elf_id = 1;
             for i in range(0, (toys_per_elf*self.NUM_ELVES)):
-                self.elves[current_elf_id][1].append(toys[i]);
+                self.elves[current_elf_id][1][toys[i][0]] = toys[i][1];
+                self.elves[current_elf_id][2][int(toys[i][1]/60.0)][0] += 1;
+                self.elves[current_elf_id][2][int(toys[i][1]/60.0)][1].append(toys[i][0])
+
                 current_elf_id += 1;
                 if current_elf_id > self.NUM_ELVES:
                     current_elf_id = 1;
 
             #For remaining toys, randomly pick an elf and assign
             for i in range((toys_per_elf*self.NUM_ELVES), len(toys)):
-                self.elves[randint(1, self.NUM_ELVES)][1].append(toys[i]);
-        
+                random_toy = randint(1, self.NUM_ELVES);
+                self.elves[random_toy][1][toys[i][0]] = toys[i][1];
+                self.elves[random_toy][2][int(toys[i][1]/60.0)][1].append(toys[i][0])
 
 
 
 
-    def assign_elf_to_toy(self, input_time, current_elf, current_toy, hrs):
+
+    def assign_elf_to_toy(self, input_time, current_elf, toy_duration, hrs):
         """ Given a toy, assigns the next elf to the toy. Computes the elf's updated rating,
         applies the rest period (if any), and sets the next available time.
         :param input_time: list of tuples (next_available_time, elf)
@@ -115,210 +112,110 @@ class Santas_lab(object):
         :return: list of elves in order of next available
         """
         start_time = hrs.next_sanctioned_minute(input_time)  # double checks that work starts during sanctioned work hours
-        duration = int(math.ceil(current_toy.duration / current_elf.rating))
+        duration = int(math.ceil(toy_duration / current_elf.rating))
         sanctioned, unsanctioned = hrs.get_sanctioned_breakdown(start_time, duration)
 
         if unsanctioned == 0:
             return hrs.next_sanctioned_minute(start_time + duration), duration
         else:
             return hrs.apply_resting_period(start_time + duration, unsanctioned), duration    
-                                
-    def objective_earliest_completion(self,prev_time,next_time,temperature):
-        if next_time < prev_time:
-            #Elf finishes earlier
-            return 1.0
-        else:
-            return math.exp( - (abs(next_time-prev_time)/60.0)/temperature );
 
-    def objective_increase_health(self, prev_rating, next_rating, temperature):
-        if next_rating > prev_rating:
-            #Elf is more healtheir
-            return 1.0
-        else:
-            return math.exp( - abs(next_rating-prev_rating)/temperature );
-            
-    def generate_neighbour(self, toys):
-        start       = 0;
-        end         = len(toys) - 1;
-        #Swap;
-        rand1       = randint(start, end);
-        rand2       = randint(start, end);
-        temp        = toys[rand2];
-        toys[rand2] = toys[rand1];
-        toys[rand1] = temp;
-        return toys;
-    
-    def evaluate(self, elf, toys, do_io=0, file_handler=None):
-        #Create a copy of elf
-        copy_elf                     = Elf(elf.id);
-        copy_elf.rating              = elf.rating;
-        copy_elf.next_available_time = elf.next_available_time;
-        copy_elf.no_toys_completed   = elf.no_toys_completed;
-        
-        for current_toy in toys:
-            elf_available_time = copy_elf.next_available_time;
-            work_start_time    = elf_available_time;
-            if current_toy.arrival_minute > elf_available_time:
-                work_start_time = current_toy.arrival_minute;
-                
-            copy_elf.next_available_time, work_duration = \
-                    self.assign_elf_to_toy(work_start_time, copy_elf, current_toy, self.hrs);
-            copy_elf.update_elf(self.hrs, current_toy, work_start_time, work_duration);
+    def play_elf(self, elf_id, toy_id):
 
-            if do_io == 1:
-                #Write it to the file handler
-                tt = self.ref_time + datetime.timedelta(seconds=60*work_start_time)
-                time_string = " ".join([str(tt.year), str(tt.month), str(tt.day), str(tt.hour), str(tt.minute)])
-                file_handler.write( str(current_toy.id) + "," + str(copy_elf.id) + "," + str(time_string) + "," + str(work_duration) + "\n");
+        work_start_time = self.elves[elf_id][0].next_available_time;
+        self.elves[elf_id][0].next_available_time, work_duration = \
+            self.assign_elf_to_toy(work_start_time, self.elves[elf_id][0], self.elves[elf_id][1][toy_id], self.hrs);
+        self.elves[elf_id][0].update_elf(self.hrs, Toy(toy_id, '2014 01 01 01 01' ,self.elves[elf_id][1][toy_id]), work_start_time, work_duration);
 
-        #Earliest time elf finishes the task.
-        return copy_elf;
-    
-                
-                    
-    def do_simulatedAnnealing(self, current_toy_list, current_elf, obj):
-        
+        tt = self.ref_time + datetime.timedelta(seconds=60*work_start_time)
+        time_string = " ".join([str(tt.year), str(tt.month), str(tt.day), str(tt.hour), str(tt.minute)])
 
-        if obj == 0:
-            #TO DO ; This need to be changed according to the objective function 
-            start_temp   = 1e+10;
-            end_temp     = 1e-2;
-            alpha        = 0.60;
-        else:
-            start_temp   = 1e+10;
-            end_temp     = 1e-2;
-            alpha        = 0.60;
+        if toy_id in self.elves[elf_id][3]:
+            print("Duplicate");
+            print(toy_id)
+            print(self.elves[elf_id][3])
+            exit(1);
+        self.elves[elf_id][3][toy_id] = (elf_id, time_string, work_duration);
+
+
+    def optimize(self):
+        #Toys less than folling counter are used to boost productivity
+        boost_productive_worker = 24;
+        #Rating thresold
+        rating_thresold = 0.30;
 
 
 
-        no_iterations    = 1000;
-        current_temp     = start_temp;
+        prev = 0;
 
-        #Overall best solution if search couldn't find a better one
-        overall_best_toy_list = None;
-        overall_best_obj      = None;
+        for i in xrange(1,2):
+            no_completed_toys = 0;
+            #Current expensive toy counter
+            exp_toy_counter = max(self.elves[i][2].keys());
+            while no_completed_toys < len(self.elves[i][1]):
+                print(" No of Completed Toys " + str(no_completed_toys))
+                print(" No of Total Toys "     + str(len(self.elves[i][1].keys())))
+                print(" No of Inserted Toys "  + str(len(self.elves[i][3].keys())))
+                if prev >= 9100:
+                    for k in self.elves[i][2]:
+                        for z in self.elves[i][2][k][1]:
+                            if z in self.elves[i][3]:
+                                pass;
+                            else:
+                                print(z)
+                                print(k)
+                                print(exp_toy_counter)
+                                print(self.elves[i][2][exp_toy_counter][0])
+                                break;
 
-        #Store a copy of the elf
-        prev_elf                     = Elf(current_elf.id);
-        prev_elf.rating              = current_elf.rating;
-        prev_elf.next_available_time = current_elf.next_available_time;
-        prev_elf.no_toys_completed   = current_elf.no_toys_completed;
+                #Play a expensive toy
+                while exp_toy_counter > boost_productive_worker and self.elves[i][2][exp_toy_counter][0] == 0:
+                    exp_toy_counter -= 1;
 
 
-        processed_elf_prev           = self.evaluate(current_elf, current_toy_list);
+                if exp_toy_counter > boost_productive_worker:
+                    #Remove the toy
+                    self.elves[i][2][exp_toy_counter][0] -= 1;
+                    for toy_id in self.elves[i][2][exp_toy_counter][1]:
+                        if toy_id in self.elves[i][3]:
+                            #Already completed
+                            pass;
+                        else:
+                            #Play this elf
+                            self.play_elf(i, toy_id);
+                            prev = no_completed_toys
+                            no_completed_toys += 1;
+
+                            break;
+
+                toys = [];
+                for k in xrange(0, boost_productive_worker+1):
+                    for z in self.elves[i][2][k][1]:
+                        if z in self.elves[i][3]:
+                            pass;
+                        else:
+                            toys.append(z);
+
+                while (self.elves[i][0].rating < rating_thresold or exp_toy_counter <= boost_productive_worker) and no_completed_toys < len(self.elves[i][1]):
+                  if len(toys) == 0:
+                      break;
+                  #Generate a random toy
+                  toy_id             = toys[randint(0, len(toys)-1)];
+                  prev = no_completed_toys
+                  no_completed_toys += 1;
+
+                  self.play_elf(i, toy_id)
+                  #Remove the toy
+                  toys.remove(toy_id);
 
 
-        #Initialize to starting solution
-        if obj == 0:
-            overall_best_obj = processed_elf_prev.next_available_time;
-        else:
-            overall_best_obj = processed_elf_prev.rating;
-        overall_best_toy_list = current_toy_list;
+        print(self.elves[1][3])
 
-        while current_temp > end_temp:
-            #Generate a list of possible neighbours at this temperature
-            current_itr = 1;
-            while True:
-                current_itr +=1;
-                if current_itr > no_iterations:
-                    break;
-                
-                #Genearate a neighbour
-                next_neighbour            = self.generate_neighbour(current_toy_list);
-                processed_elf_current     = self.evaluate(current_elf, next_neighbour);
 
-                if obj == 0:
-                    p = self.objective_earliest_completion(processed_elf_current.next_available_time, processed_elf_prev.next_available_time, current_temp);
 
-                else:
-                    p = self.objective_increase_health(processed_elf_current.rating, processed_elf_prev.rating, current_temp);
+
 
                 
-                if random.random() < p:
-                    #Take the Step
-                    current_toy_list        = next_neighbour;
-                    processed_elf_prev      = processed_elf_current;
-
-                    #Update if the new global minima is found
-                    if obj == 0:
-                        if processed_elf_prev.next_available_time < overall_best_obj:
-                            overall_best_obj = processed_elf_prev.next_available_time;
-                            overall_best_toy_list = next_neighbour;
-                    else:
-                        if processed_elf_prev.rating > overall_best_obj:
-                            overall_best_obj = processed_elf_prev.rating;
-                            overall_best_toy_list = next_neighbour;
-                    ################### 
-                    break;
-            if obj == 0:
-                #print( "Elf : " + str(processed_elf_prev.id) + " Temp :" + str(current_temp) + "  Completion Time : " +str(processed_elf_prev.next_available_time) +"\n")
-                pass;
-            else:
-                #print( "Elf : " + str(processed_elf_prev.id) + " Temp :" + str(current_temp) + "  Rating : " +str(processed_elf_prev.rating) +"\n")
-                pass;
-                    
-            #Decrease the temperature
-            current_temp = current_temp * alpha;
-        
-        if obj == 0:
-            if overall_best_obj > current_elf.next_available_time:
-                overall_best_toy_list = current_toy_list;
-            #print( "Elf : " + str(current_elf.id) + " Temp :" + str(current_temp) + "  Overall Completion Time : " +str(overall_best_obj) + "\n")
-        else:
-            if overall_best_obj < current_elf.rating:
-                overall_best_toy_list = current_toy_list;
-            #print( "Elf : " + str(current_elf.id) + " Temp :" + str(current_temp) + " Overall Rating : " +str(overall_best_obj) + "\n")
-
-        #Now, that best ordering is found out; exceute it on the elf
-        return self.evaluate(prev_elf, overall_best_toy_list) , overall_best_toy_list;
-
-    def optimize_elf(self, elf_id):
-        toy_list         = self.elves[elf_id][1];
-        current_elf      = self.elves[elf_id][0];
-        toy_batch_sz     = 20;
-        counter          = 0;
-        obj              = 0; #Possible values 0 - decreased completion time, 1 - increase health
-
-        #Shuffle the toys
-        shuffle(toy_list);
-        while counter < len(toy_list):
-            #Pick batch
-            current_toy_list                   = toy_list[counter:(counter+toy_batch_sz)];
-            current_elf, optimum_toy_list      = self.do_simulatedAnnealing(current_toy_list, current_elf, obj);
-            counter                           += toy_batch_sz;
-
-            print("Batch :"  + str(counter/toy_batch_sz))
-
-            #Add the optimum toy_list in that order
-            for ot in optimum_toy_list:
-                self.elves[elf_id][2].append(ot);
-
-            #Change the objective goal
-            if obj == 0 :
-                obj = 1;
-            else:
-                obj = 0;
-
-    def dumpAllocations(self):
-        '''
-          Dumps allocations for all the toys into their respective files
-        '''
-        for i in xrange(1, self.NUM_ELVES+1):
-            file_name = "data/" + str(i) + "_allocation.csv";
-            fh        = open(file_name, "w");
-            fh.write('ToyId,Arrival,Duration\n');
-
-            #Write the Toys
-            for toy in self.elves[i][1]:
-               fh.write(str(toy.id) +"," + str(toy.arrival) + "," + str(toy.duration) + "\n");
-            fh.close();
-
-
-
-    def write(self, elf_id, fh):
-        current_elf         = self.elves[elf_id][0];
-        optimum_toy_list    = self.elves[elf_id][2];
-        self.evaluate(current_elf, optimum_toy_list, 1, fh);
 
 
 
@@ -330,26 +227,14 @@ if __name__ == '__main__':
 
     start = time.time();
     NUM_ELVES = 900;
-    
+    #Construct workflows for toys and dump them
     soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev22.csv');
+    toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
+    santa     = Santas_lab(NUM_ELVES, toy_file);
+    santa.allocate_baskets_to_elf();
+    santa.optimize()
 
-    if int(args[0]) == 1:
-        #Construct workflows for toys and dump them
-        toy_file  = os.path.join(os.getcwd(), 'data/toys_rev22.csv');
-        santa     = Santas_lab(NUM_ELVES, toy_file);
-        santa.allocate_baskets_to_elf();
-        santa.dumpAllocations();
-    elif int(args[0]) == 2:
-        #Optimize the workflow of the given elf.
-        elf_id    = int(args[1]);
-        toy_file  = args[2];
-        santa     = Santas_lab(NUM_ELVES, toy_file, True, elf_id);
-        santa.optimize_elf(elf_id);
-        file_name = "data/" + str(elf_id) + "_ans.csv";
-        fh        = open(file_name, "w");
-        fh.write('ToyId,ElfId,StartTime,Duration\n');
-        santa.write(elf_id,fh);
-        fh.close();
+
         
     print 'total runtime = {0}'.format(time.time() - start);
 
