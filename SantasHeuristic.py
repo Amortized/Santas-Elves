@@ -105,6 +105,12 @@ class Santas_lab(object):
 
 
 
+    def breakDownWork(self, input_time, current_elf, toy_duration, hrs):
+        start_time = hrs.next_sanctioned_minute(input_time)  # double checks that work starts during sanctioned work hours
+        duration = int(math.ceil(toy_duration / current_elf.rating))
+        sanctioned, unsanctioned = hrs.get_sanctioned_breakdown(start_time, duration)
+
+        return sanctioned, unsanctioned;
 
 
     def assign_elf_to_toy(self, input_time, current_elf, toy_duration, hrs):
@@ -125,9 +131,12 @@ class Santas_lab(object):
         else:
             return hrs.apply_resting_period(start_time + duration, unsanctioned), duration    
 
-    def play_elf(self, elf_id, toy_id):
+    def play_elf(self, elf_id, toy_id, work_start_time=None):
 
-        work_start_time = self.elves[elf_id][0].next_available_time;
+        if work_start_time == None:
+           work_start_time = self.elves[elf_id][0].next_available_time;
+
+
         self.elves[elf_id][0].next_available_time, work_duration = \
             self.assign_elf_to_toy(work_start_time, self.elves[elf_id][0], self.elves[elf_id][1][toy_id], self.hrs);
         self.elves[elf_id][0].update_elf(self.hrs, Toy(toy_id, '2014 01 01 01 01' ,self.elves[elf_id][1][toy_id]), work_start_time, work_duration);
@@ -150,12 +159,13 @@ class Santas_lab(object):
         #Rating thresold
         rating_thresold = 0.30;
 
-        for i in xrange(1, 2):
+        for i in [10,123,233]:
             print("Optimizing : Elf " + str(i)  );
             no_completed_toys = 0;
             #Current expensive toy counter
             exp_toy_counter = max(self.elves[i][2].keys());
             while no_completed_toys < len(self.elves[i][1]):
+                print(no_completed_toys)
                 #Play a expensive toy
                 while exp_toy_counter > boost_productive_worker and self.elves[i][2][exp_toy_counter][0] == 0:
                     exp_toy_counter -= 1;                    
@@ -185,13 +195,36 @@ class Santas_lab(object):
                 while (self.elves[i][0].rating < rating_thresold or exp_toy_counter <= boost_productive_worker) and no_completed_toys < len(self.elves[i][1]):
                   if len(toys) == 0:
                       break;
-                  #Generate a random toy
-                  toy_id             = toys[randint(0, len(toys)-1)];
-                  no_completed_toys += 1;
 
-                  self.play_elf(i, toy_id)
-                  #Remove the toy
-                  toys.remove(toy_id);
+                  
+                  shuffle(toys);
+                  min_unsanctioned_time = sys.maxsize;
+                  min_toy_id            = None;
+                  played                = False;
+
+                  for toy_id in toys:
+                    #Play the toy with no unsanctioned time
+                    sanctioned, unsanctioned = self.breakDownWork(self.elves[i][0].next_available_time, self.elves[i][0], self.elves[i][1][toy_id], self.hrs);
+                    if unsanctioned == 0:
+                        self.play_elf(i, toy_id)
+                        #Remove the toy
+                        toys.remove(toy_id);
+                        played = True;
+                        no_completed_toys += 1;
+                        break;
+                    elif unsanctioned < min_unsanctioned_time:
+                        min_toy_id = toy_id;
+                        min_unsanctioned_time = unsanctioned;
+
+                  if played == False:
+                    #Set the next available time to next day, 9:00 am
+                    work_start_time = self.hrs.day_start  + int(self.hrs.minutes_in_24h * math.ceil(self.elves[i][0].next_available_time / self.hrs.minutes_in_24h));
+                    self.play_elf(i, min_toy_id, work_start_time);
+                    toys.remove(min_toy_id);
+                    no_completed_toys += 1;
+                    print("Played judicisouly" + str(len(toys)))
+                          
+                  
 
             #Flush the output of this elf to file
             for toy_id in self.elves[i][3]:
@@ -224,7 +257,7 @@ if __name__ == '__main__':
     start = time.time();
     NUM_ELVES = 900;
     #Construct workflows for toys and dump them
-    soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev2.csv');
+    soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev222.csv');
     toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
     santa     = Santas_lab(NUM_ELVES, toy_file, soln_file);
     santa.allocate_baskets_to_elf();
