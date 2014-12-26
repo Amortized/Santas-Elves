@@ -165,8 +165,12 @@ def play_elf(output, elf_object, toy_id, toy_duration, work_start_time=None):
 
 
 def optimize(elf_object, toy_duration_map, duration_bucket):
-
-
+    """
+    :param elf_object:  Elf Object
+    :param toy_duration_map:  Dict of Toy_id -> duration
+    :param duration_bucket: Dict of   Toy_Duration_Hr -> [(No_of_toys,   [Toy_id])]
+    :return:
+    """
     output                      = dict();
     file_handler                = open(  ("data/submission_" + str(elf_object.id) + ".csv"), "wb"  );
     hrs                         = Hours();
