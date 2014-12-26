@@ -11,18 +11,17 @@ import operator
 from hours import Hours
 from toy import Toy
 from elf import Elf
-import numpy as np;
 from random import shuffle;
 from random import randint;
 import random;
 import pickle;
 import sys;
 import time;
+from multiprocessing import Pool;
 
 class Santas_lab(object):
-    def __init__(self, NUM_ELVES, toy_file, soln_file):
+    def __init__(self, NUM_ELVES, toy_file):
         #Output file
-        self.output                   = open(soln_file, "w");
         self.hrs                      = Hours()
         self.NUM_ELVES                = NUM_ELVES;
         self.ref_time                 = datetime.datetime(2014, 1, 1, 0, 0);
@@ -35,10 +34,7 @@ class Santas_lab(object):
         #Every elf maintains list of toys which it has to optically work on
         for i in xrange(1, NUM_ELVES+1):
             elf = Elf(i);
-            self.elves[elf.id]  = (elf, dict(), dict(), dict());
-
-        self.temp_earlier = 0;
-
+            self.elves[elf.id]  = (elf, dict(), dict());
 
 
 
@@ -78,7 +74,7 @@ class Santas_lab(object):
         '''
         #Initialize the hour map maintained by each elf
         for i in xrange(1, self.NUM_ELVES+1):
-            for hr in xrange(0, 1000):
+            for hr in xrange(0, 1000): #No Task is greater than 1000hrs
                 self.elves[i][2][hr] = [0, []];
 
         for bucket in self.toy_baskets:
@@ -105,148 +101,168 @@ class Santas_lab(object):
 
 
 
-    def breakDownWork(self, input_time, current_elf, toy_duration, hrs):
-        start_time = hrs.next_sanctioned_minute(input_time)  # double checks that work starts during sanctioned work hours
-        duration = int(math.ceil(toy_duration / current_elf.rating))
-        sanctioned, unsanctioned = hrs.get_sanctioned_breakdown(start_time, duration)
 
-        return sanctioned, unsanctioned;
+def breakDownWork(input_time, current_elf, toy_duration, hrs):
+    """
+
+    :param input_time: Datetime object
+    :param current_elf: Elf Object
+    :param toy_duration: Duration of Toy
+    :param hrs: Hrs Object
+    :return:
+    """
+    start_time = hrs.next_sanctioned_minute(input_time)  # double checks that work starts during sanctioned work hours
+    duration = int(math.ceil(toy_duration / current_elf.rating))
+    sanctioned, unsanctioned = hrs.get_sanctioned_breakdown(start_time, duration)
+
+    return sanctioned, unsanctioned;
 
 
-    def assign_elf_to_toy(self, input_time, current_elf, toy_duration, hrs):
-        """ Given a toy, assigns the next elf to the toy. Computes the elf's updated rating,
+def assign_elf_to_toy(input_time, current_elf, toy_duration, hrs):
+    """ Given a toy, assigns the next elf to the toy. Computes the elf's updated rating,
         applies the rest period (if any), and sets the next available time.
         :param input_time: list of tuples (next_available_time, elf)
         :param current_elf: elf object
         :param current_toy: toy object
         :param hrs: hours object
         :return: list of elves in order of next available
-        """
-        start_time = hrs.next_sanctioned_minute(input_time)  # double checks that work starts during sanctioned work hours
-        duration = int(math.ceil(toy_duration / current_elf.rating))
-        sanctioned, unsanctioned = hrs.get_sanctioned_breakdown(start_time, duration)
+    """
+    start_time = hrs.next_sanctioned_minute(input_time)  # double checks that work starts during sanctioned work hours
+    duration = int(math.ceil(toy_duration / current_elf.rating))
+    sanctioned, unsanctioned = hrs.get_sanctioned_breakdown(start_time, duration)
 
-        if unsanctioned == 0:
-            return hrs.next_sanctioned_minute(start_time + duration), duration
-        else:
-            return hrs.apply_resting_period(start_time + duration, unsanctioned), duration    
+    if unsanctioned == 0:
+        return hrs.next_sanctioned_minute(start_time + duration), duration
+    else:
+        return hrs.apply_resting_period(start_time + duration, unsanctioned), duration
 
-    def play_elf(self, elf_id, toy_id, work_start_time=None):
+def play_elf(output, elf_object, toy_id, toy_duration, work_start_time=None):
+    """
 
-        if work_start_time == None:
-           work_start_time = self.elves[elf_id][0].next_available_time;
+    :param elf_id:  Elf id
+    :param toy_id:  Toy_Id
+    :param work_start_time: Minute since Jan, 2014
+    :return:
+    """
+
+    hrs          = Hours();
+    ref_time     = datetime.datetime(2014, 1, 1, 0, 0);
+
+    if work_start_time == None:
+           work_start_time = elf_object.next_available_time;
 
 
-        self.elves[elf_id][0].next_available_time, work_duration = \
-            self.assign_elf_to_toy(work_start_time, self.elves[elf_id][0], self.elves[elf_id][1][toy_id], self.hrs);
-        self.elves[elf_id][0].update_elf(self.hrs, Toy(toy_id, '2014 01 01 01 01' ,self.elves[elf_id][1][toy_id]), work_start_time, work_duration);
+    elf_object.next_available_time, work_duration = \
+        assign_elf_to_toy(work_start_time, elf_object, toy_duration, hrs);
+    elf_object.update_elf(hrs, Toy(toy_id, '2014 01 01 01 01' ,toy_duration), work_start_time, work_duration); #Every toy has default arrival time(irrelevant)
 
  
-        tt = self.ref_time + datetime.timedelta(seconds=60*work_start_time)
-        time_string = " ".join([str(tt.year), str(tt.month), str(tt.day), str(tt.hour), str(tt.minute)])
+    tt = ref_time + datetime.timedelta(seconds=60*work_start_time)
+    time_string = " ".join([str(tt.year), str(tt.month), str(tt.day), str(tt.hour), str(tt.minute)])
+    output[toy_id] = (elf_object.id, time_string, work_duration);
 
-        if tt.year > self.temp_earlier:
-            self.temp_earlier = tt.year;
-
-        self.elves[elf_id][3][toy_id] = (elf_id, time_string, work_duration);
+    return tt.year;
 
 
-    def optimize(self):
-        self.output.write("ToyId,ElfId,StartTime,Duration\n");
-
-        #Toys less than folling counter are used to boost productivity
-        boost_productive_worker = 24;
-        #Rating thresold
-        rating_thresold = 0.30;
-
-        for i in [10,123,233]:
-            print("Optimizing : Elf " + str(i)  );
-            no_completed_toys = 0;
-            #Current expensive toy counter
-            exp_toy_counter = max(self.elves[i][2].keys());
-            while no_completed_toys < len(self.elves[i][1]):
-                print(no_completed_toys)
-                #Play a expensive toy
-                while exp_toy_counter > boost_productive_worker and self.elves[i][2][exp_toy_counter][0] == 0:
-                    exp_toy_counter -= 1;                    
+def optimize(elf_object, toy_duration_map, duration_bucket):
 
 
-                if exp_toy_counter > boost_productive_worker:
+    output                      = dict();
+    file_handler                = open(  ("data/submission_" + str(elf_object.id) + ".csv"), "wb"  );
+    hrs                         = Hours();
+    last_job_completed_year     = 0;
+
+    #Toys less than folling counter are used to boost productivity
+    boost_productive_worker = 24;
+    #Rating thresold
+    rating_thresold = 0.30;
+
+    no_completed_toys = 0;
+    #Current expensive toy counter
+    exp_toy_counter = max(duration_bucket.keys());
+    while no_completed_toys < len(toy_duration_map):
+        print("Optimizing : Elf " + str(elf_object.id)  + " Completed : " + str(no_completed_toys));
+        #Play a expensive toy
+        while exp_toy_counter > boost_productive_worker and duration_bucket[exp_toy_counter][0] == 0:
+            exp_toy_counter -= 1;
+
+        if exp_toy_counter > boost_productive_worker:
+           #Remove the toy
+           duration_bucket[exp_toy_counter][0] -= 1;
+           for toy_id in duration_bucket[exp_toy_counter][1]:
+               if toy_id in output:
+                   #Already completed
+                   pass;
+               else:
+                   #Play this elf
+                   completion_yr = play_elf(output, elf_object, toy_id, toy_duration_map[toy_id]);
+                   if completion_yr > last_job_completed_year:
+                       last_job_completed_year = completion_yr;
+                   no_completed_toys += 1;
+                   break;
+
+
+        toys = [];
+        for k in xrange(0, boost_productive_worker+1):
+            for z in duration_bucket[k][1]:
+                if z in output:
+                    pass;
+                else:
+                    toys.append(z);
+
+        while (elf_object.rating < rating_thresold or exp_toy_counter <= boost_productive_worker) and no_completed_toys < len(toy_duration_map):
+            if len(toys) == 0:
+                break;
+
+
+            shuffle(toys);
+            min_unsanctioned_time = sys.maxsize;
+            min_toy_id            = None;
+            played                = False;
+
+            for toy_id in toys:
+                #Play the toy with no unsanctioned time
+                sanctioned, unsanctioned = breakDownWork(elf_object.next_available_time, elf_object, toy_duration_map[toy_id], hrs);
+                if unsanctioned == 0:
+                    completion_yr = play_elf(output, elf_object, toy_id, toy_duration_map[toy_id]);
+                    if completion_yr > last_job_completed_year:
+                        last_job_completed_year = completion_yr;
                     #Remove the toy
-                    self.elves[i][2][exp_toy_counter][0] -= 1;
-                    for toy_id in self.elves[i][2][exp_toy_counter][1]:
-                        if toy_id in self.elves[i][3]:
-                            #Already completed
-                            pass;
-                        else:
-                            #Play this elf
-                            self.play_elf(i, toy_id);
-                            no_completed_toys += 1;
-                            break;
-
-                toys = [];
-                for k in xrange(0, boost_productive_worker+1):
-                    for z in self.elves[i][2][k][1]:
-                        if z in self.elves[i][3]:
-                            pass;
-                        else:
-                            toys.append(z);
-
-                while (self.elves[i][0].rating < rating_thresold or exp_toy_counter <= boost_productive_worker) and no_completed_toys < len(self.elves[i][1]):
-                  if len(toys) == 0:
-                      break;
-
-                  
-                  shuffle(toys);
-                  min_unsanctioned_time = sys.maxsize;
-                  min_toy_id            = None;
-                  played                = False;
-
-                  for toy_id in toys:
-                    #Play the toy with no unsanctioned time
-                    sanctioned, unsanctioned = self.breakDownWork(self.elves[i][0].next_available_time, self.elves[i][0], self.elves[i][1][toy_id], self.hrs);
-                    if unsanctioned == 0:
-                        self.play_elf(i, toy_id)
-                        #Remove the toy
-                        toys.remove(toy_id);
-                        played = True;
-                        no_completed_toys += 1;
-                        break;
-                    elif unsanctioned < min_unsanctioned_time:
-                        min_toy_id = toy_id;
-                        min_unsanctioned_time = unsanctioned;
-
-                  if played == False:
-                    #Set the next available time to next day, 9:00 am
-                    work_start_time = self.hrs.day_start  + int(self.hrs.minutes_in_24h * math.ceil(self.elves[i][0].next_available_time / self.hrs.minutes_in_24h));
-                    self.play_elf(i, min_toy_id, work_start_time);
-                    toys.remove(min_toy_id);
+                    toys.remove(toy_id);
+                    played = True;
                     no_completed_toys += 1;
-                    print("Played judicisouly" + str(len(toys)))
-                          
-                  
+                    break;
+                elif unsanctioned < min_unsanctioned_time:
+                    min_toy_id = toy_id;
+                    min_unsanctioned_time = unsanctioned;
 
-            #Flush the output of this elf to file
-            for toy_id in self.elves[i][3]:
-                self.output.write(  str(toy_id) + "," + \
-                               str(self.elves[i][3][toy_id][0]) + "," \
-                             + str(self.elves[i][3][toy_id][1]) + "," \
-                             + str(self.elves[i][3][toy_id][2]) + "\n" \
-                            );
-            #Remove memory footprint
-            self.elves[i] = None;
-
-
-
-        self.output.close();
-        print(self.temp_earlier)  
+            if played == False:
+                #Set the next available time to next day, 9:00 am
+                work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / hrs.minutes_in_24h));
+                completion_yr = play_elf(output, elf_object, min_toy_id, toy_duration_map[min_toy_id], work_start_time);
+                if completion_yr > last_job_completed_year:
+                    last_job_completed_year = completion_yr;
+                toys.remove(min_toy_id);
+                no_completed_toys += 1;
+                print("Optimizing : Elf " + str(elf_object.id)  + " Boosters remaining : " + str(len(toys)));
 
 
 
+
+    #Flush the output of this elf to file
+    for toy_id in output:
+        file_handler.write( str(toy_id) + "," + str(output[toy_id][0]) + "," \
+                            + str(output[toy_id][1]) + "," + str(output[toy_id][2]) + "\n");
+
+    file_handler.close();
+
+    print(last_job_completed_year)
+
+
+def optimize_wrapper(args):
+    optimize(*args);
 
                 
-
-
 
 # ======================================================================= #
 # === MAIN === #
@@ -257,11 +273,19 @@ if __name__ == '__main__':
     start = time.time();
     NUM_ELVES = 900;
     #Construct workflows for toys and dump them
-    soln_file = os.path.join(os.getcwd(), 'data/sampleSubmission_rev222.csv');
     toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
-    santa     = Santas_lab(NUM_ELVES, toy_file, soln_file);
+    santa     = Santas_lab(NUM_ELVES, toy_file);
     santa.allocate_baskets_to_elf();
-    santa.optimize()
+
+    #Contruct parameters as a list
+    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, NUM_ELVES+1)];
+
+    #Create a Thread pool.
+    pool     = Pool();
+    pool.map( optimize_wrapper, elf_worflows );
+
+    pool.close();
+    pool.join();
 
 
         
