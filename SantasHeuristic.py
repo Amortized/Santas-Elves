@@ -175,12 +175,20 @@ def optimize(elf_object, toy_duration_map, duration_bucket):
     #Toys less than folling counter are used to boost productivity
     boost_productive_worker = 24;
     #Rating thresold
-    rating_thresold = 0.30;
+    rating_thresold = 0.40;
+    
+    #Job's which require productivity to be maintained at above 0.40
+    decrease_productivity_threshold = 150;
+
+
 
     no_completed_toys = 0;
     #Current expensive toy counter
     exp_toy_counter = max(duration_bucket.keys());
     while no_completed_toys < len(toy_duration_map):
+        if exp_toy_counter < decrease_productivity_threshold:
+           rating_thresold = 0.30; 
+
         print("Optimizing : Elf " + str(elf_object.id)  + " Completed : " + str(no_completed_toys));
         #Play a expensive toy
         while exp_toy_counter > boost_productive_worker and duration_bucket[exp_toy_counter][0] == 0:
@@ -256,11 +264,11 @@ def optimize(elf_object, toy_duration_map, duration_bucket):
 
     file_handler.close();
 
-    print(last_job_completed_year)
+    return last_job_completed_year;
 
 
 def optimize_wrapper(args):
-    optimize(*args);
+    return optimize(*args);
 
                 
 
@@ -277,17 +285,17 @@ if __name__ == '__main__':
     santa     = Santas_lab(NUM_ELVES, toy_file);
     santa.allocate_baskets_to_elf();
 
+
     #Contruct parameters as a list
-    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, NUM_ELVES+1)];
+    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, NUM_ELVES+1) ];
 
     #Create a Thread pool.
     pool     = Pool();
-    pool.map( optimize_wrapper, elf_worflows );
+    results  = pool.map( optimize_wrapper, elf_worflows );
 
     pool.close();
     pool.join();
 
-
-        
+    print("Last Job Completed in year : " + str(max(results)));
     print 'total runtime = {0}'.format(time.time() - start);
 
