@@ -168,25 +168,74 @@ def play_elf(output, elf_object, toy_id, toy_duration, work_start_time=None):
     return tt.year;
 
 
-def preOptimization(highest_desired_rating, decay_rate, rating_change_threshold1, rating_change_threshold2):
+def powerRequiredEstimation(big_jobs, hrs):
     """
 
-    :param highest_desired_rating:  Highest possible rating
-    :param decay_rate:  Rate at which desired rating drops
-    :param rating_change_threshold: Rating at which current decay_rate changes
+    :param big_jobs:  List of Big Jobs
+    :param hrs:  Hrs Object
     :return:
     """
-    ratings        = [];
-    current_rating = highest_desired_rating;
-    while current_rating > 0.25:
-        ratings.append(current_rating);
-        if current_rating <= rating_change_threshold1:
-            decay_rate = 0.0004;
-        if current_rating <= rating_change_threshold2:
-            decay_rate = 0.0001;
-            
-        #Exponential decay
-        current_rating = current_rating * math.exp(-decay_rate);
+    power_per_unit   = [];
+    #Dummy Elf
+    dummy_elf        = Elf(0);
+    dummy_elf.rating = 0.25;
+
+
+    for job in big_jobs:
+      #Play the toys at min rating at 9:00 on start of the day
+      sanctioned, unsanctioned = breakDownWork(dummy_elf.next_available_time, dummy_elf, job[1], hrs);
+      power_per_unit.append(unsanctioned);
+
+    total_power    = sum(power_per_unit);
+    power_per_unit = [i/float(total_power) for i in power_per_unit];
+
+    return power_per_unit;
+
+def powerAvailableEstimation(big_jobs, boosters, hrs):
+    '''
+      Assume a rating of 0.25, total gain in ratings that can be obtained for different jobs 
+    '''
+   
+    total_gain              = 0.0;
+    ratio_big_jobs_boosters = len(big_jobs) / float( len(big_jobs)  + len(boosters) );
+
+    #Dummy Elf
+    dummy_elf               = Elf(0);
+    dummy_elf.rating        = 0.25;
+
+    work_start_time         = 540; #All boosters are played with maximum sanctioned time
+
+    shuffle(boosters);
+
+    for job in boosters:
+        
+        #Assume the work starts at 9:00 on start of the day
+        next_available_time, work_duration = \
+           assign_elf_to_toy(work_start_time, dummy_elf, job[1], hrs);
+
+        dummy_elf.update_elf(hrs, Toy(0, '2014 01 01 01 01' ,job[1]), work_start_time, work_duration); #Every toy has default arrival time(irrelevant)
+
+        #Flip a coin and play a big job based on above probability
+        if random.random() < ratio_big_jobs_boosters:
+            #Big Job Played - Measure the gain
+            if dummy_elf.rating > 0.25:
+               total_gain += (dummy_elf.rating - 0.25);
+            #Reinitialize the dummy_elf
+            dummy_elf               = Elf(0);
+            dummy_elf.rating        = 0.25;
+
+
+    return total_gain;
+
+
+def generateOptimumRatings(big_jobs, boosters, hrs):
+    #Generate desired ratings
+    power_reqd_per_unit  = powerRequiredEstimation(big_jobs, hrs);
+    #Total Gain Estimation - Repeat the random process x=10 times
+    total_gain           = sum([powerAvailableEstimation(big_jobs, boosters, hrs) for x in range(0, 10)]) / float(10.0);
+    
+    ratings              = [ 0.25 + (power_reqd_per_unit[i] * total_gain) for i in range(0, len(power_reqd_per_unit))];
+
     return ratings;
 
 
@@ -198,30 +247,27 @@ def optimize(elf_object, boosters, big_jobs):
     :return:
     """
 
-
     output                      = [];
     file_handler                = open(  ("data/submission_" + str(elf_object.id) + ".csv"), "wb"  );
     hrs                         = Hours();
     last_job_completed_year     = 0;
-    highest_desired_rating      = 0.40;
-    decay_rate                  = 0.0002;
-    rating_change_threshold1    = 0.35;
-    rating_change_threshold2    = 0.35;
-    min_desired_rating          = 0.30;
+
+
+    min_desired_rating          = 0.26;
 
     total_no_of_toys            = len(boosters) + len(big_jobs);
     #Sort the big jobs in descending order of duration
     big_jobs.sort(key=operator.itemgetter(1),reverse=True)
+
     no_completed_toys = 0;
     big_job_counter   = 0;
-    #Generate desired ratings
-    ratings  = preOptimization(highest_desired_rating, decay_rate, rating_change_threshold1, rating_change_threshold2);
 
+    ratings           = generateOptimumRatings(big_jobs, boosters, hrs);
 
     while no_completed_toys < total_no_of_toys:
 
-        print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)));
-
+        print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)) + " Last Completed Year : " +str(last_job_completed_year));
+        
         if len(big_jobs) > 0:
             #Play the first toy in the queue
             completion_yr = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1]);
@@ -231,18 +277,13 @@ def optimize(elf_object, boosters, big_jobs):
             #Delete this toy
             del big_jobs[0];
 
-            """
-            #Set the required rating for the next big job
+            #Set the desired rating for the next job
             if big_job_counter < len(ratings):
-                min_desired_rating = ratings[big_job_counter];
-            """
-            #Desired rating is based on job hr threshold for now.
-            if len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) > 150:
-                min_desired_rating = 0.40;
-            
+               min_desired_rating  = ratings[big_job_counter];
+               big_job_counter    += 1;
 
             no_completed_toys += 1;
-            big_job_counter   += 1;
+
 
         print("**Seeking a rating : " + str(min_desired_rating));
 
@@ -319,7 +360,7 @@ if __name__ == '__main__':
     santa.allocate_baskets_to_elf();
 
     #Contruct parameters as a list
-    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, self.NUM_ELVES+1) ];
+    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, NUM_ELVES+1) ];
 
     #Create a Thread pool.
     pool     = Pool();
