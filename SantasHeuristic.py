@@ -207,7 +207,7 @@ def optimize(elf_object, boosters, big_jobs):
     decay_rate                  = 0.0002;
     rating_change_threshold1    = 0.35;
     rating_change_threshold2    = 0.35;
-    min_desired_rating          = 0.25;
+    min_desired_rating          = 0.30;
 
     total_no_of_toys            = len(boosters) + len(big_jobs);
     #Sort the big jobs in descending order of duration
@@ -231,9 +231,15 @@ def optimize(elf_object, boosters, big_jobs):
             #Delete this toy
             del big_jobs[0];
 
+            """
             #Set the required rating for the next big job
             if big_job_counter < len(ratings):
                 min_desired_rating = ratings[big_job_counter];
+            """
+            #Desired rating is based on job hr threshold for now.
+            if len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) > 150:
+                min_desired_rating = 0.40;
+            
 
             no_completed_toys += 1;
             big_job_counter   += 1;
@@ -313,7 +319,7 @@ if __name__ == '__main__':
     santa.allocate_baskets_to_elf();
 
     #Contruct parameters as a list
-    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, 2) ];
+    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, self.NUM_ELVES+1) ];
 
     #Create a Thread pool.
     pool     = Pool();
