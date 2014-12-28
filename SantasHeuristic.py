@@ -16,6 +16,7 @@ from random import randint;
 import random;
 import pickle;
 import sys;
+import copy;
 import time;
 from multiprocessing import Pool;
 
@@ -228,13 +229,17 @@ def powerAvailableEstimation(big_jobs, boosters, hrs):
     return total_gain;
 
 
-def generateOptimumRatings(big_jobs, boosters, hrs):
+def generateOptimumRatings(big_jobs, boosters, hrs, alpha):
+    '''
+       Generates optimimum ratings for the big_jobs to be operated on
+    '''
+    
     #Generate desired ratings
     power_reqd_per_unit  = powerRequiredEstimation(big_jobs, hrs);
     #Total Gain Estimation - Repeat the random process x=10 times
     total_gain           = sum([powerAvailableEstimation(big_jobs, boosters, hrs) for x in range(0, 10)]) / float(10.0);
     
-    ratings              = [ 0.25 + (power_reqd_per_unit[i] * total_gain) for i in range(0, len(power_reqd_per_unit))];
+    ratings              = [ 0.25 + alpha + (power_reqd_per_unit[i] * total_gain) for i in range(0, len(power_reqd_per_unit))];
 
     return ratings;
 
@@ -253,8 +258,8 @@ def optimize(elf_object, boosters, big_jobs):
     hrs                         = Hours();
     last_job_completed_year     = 0;
 
-
-    min_desired_rating          = 0.26;
+    alpha                       = 0.08;           #BumpupParameter
+    min_desired_rating          = (0.25 + alpha); #Base Min Rate + Bumpup Parameter
 
     total_no_of_toys            = len(boosters) + len(big_jobs);
     #Sort the big jobs in descending order of duration
@@ -265,22 +270,27 @@ def optimize(elf_object, boosters, big_jobs):
     no_completed_toys = 0;
     big_job_counter   = 0;
 
-    ratings           = generateOptimumRatings(big_jobs, boosters, hrs);
+    ratings           = generateOptimumRatings(big_jobs, boosters, hrs, alpha);
+
+
     spill_over        = 0.0;    
 
     while no_completed_toys < total_no_of_toys:
 
-        print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)) + " Last Completed Year : " +str(last_job_completed_year));
+        #print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)) + " Last Completed Year : " +str(last_job_completed_year));
         
         if len(big_jobs) > 0:
 
-            if big_job_counter > 0:
+            if big_job_counter > 0 and len(boosters) > 0:
               spill_over = (elf_object.rating - ratings[big_job_counter-1]);
-              print("*Spill Over : " + str(spill_over));
+              #print("*Spill Over : " + str(spill_over));
 
 
-            #Play the first toy in the queue
-            completion_yr = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1]);
+            #Play the first toy in the queue on the following day
+            work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / hrs.minutes_in_24h));
+            completion_yr   = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1], work_start_time);
+
+            #completion_yr = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1]);
             if completion_yr > last_job_completed_year:
                 last_job_completed_year = completion_yr;
             
@@ -294,8 +304,8 @@ def optimize(elf_object, boosters, big_jobs):
                   min_desired_rating -= spill_over;
 
                #Rating cannot drop below 
-               if min_desired_rating < 0.28:
-                 min_desired_rating = 0.28;
+               if min_desired_rating < (0.25 + alpha):
+                 min_desired_rating = (0.25 + alpha);
                ratings[big_job_counter] = min_desired_rating; 
                    
                big_job_counter    += 1;
@@ -303,12 +313,12 @@ def optimize(elf_object, boosters, big_jobs):
             no_completed_toys += 1;
 
 
-        print("**Seeking a rating : " + str(min_desired_rating));
+        #print("**Seeking a rating : " + str(min_desired_rating));
 
 
         #Iterate through the boosters and increase the productivity
         while ( round(elf_object.rating,3) + 0.002 < round(min_desired_rating,3) or len(big_jobs) == 0) and no_completed_toys < total_no_of_toys:
-            print("***Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)))
+            #print("***Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)))
 
             if len(boosters) == 0:
                 break;
@@ -372,7 +382,7 @@ if __name__ == '__main__':
     santa.allocate_baskets_to_elf();
 
     #Contruct parameters as a list
-    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, 2) ];
+    elf_worflows = [ (Elf(i), copy.copy(santa.elves[i][1]), copy.copy(santa.elves[i][2]) ) for i in xrange(1, NUM_ELVES+1) ];
 
     #Create a Thread pool.
     pool     = Pool();
