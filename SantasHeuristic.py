@@ -247,6 +247,7 @@ def optimize(elf_object, boosters, big_jobs):
     :return:
     """
 
+
     output                      = [];
     file_handler                = open(  ("data/submission_" + str(elf_object.id) + ".csv"), "wb"  );
     hrs                         = Hours();
@@ -263,12 +264,19 @@ def optimize(elf_object, boosters, big_jobs):
     big_job_counter   = 0;
 
     ratings           = generateOptimumRatings(big_jobs, boosters, hrs);
+    spill_over        = 0.0;    
 
     while no_completed_toys < total_no_of_toys:
 
         print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)) + " Last Completed Year : " +str(last_job_completed_year));
         
         if len(big_jobs) > 0:
+
+            if big_job_counter > 0:
+              spill_over = (elf_object.rating - ratings[big_job_counter-1]);
+              print("*Spill Over : " + str(spill_over));
+
+
             #Play the first toy in the queue
             completion_yr = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1]);
             if completion_yr > last_job_completed_year:
@@ -280,6 +288,14 @@ def optimize(elf_object, boosters, big_jobs):
             #Set the desired rating for the next job
             if big_job_counter < len(ratings):
                min_desired_rating  = ratings[big_job_counter];
+               if (min_desired_rating - spill_over) >= 0.25:
+                  min_desired_rating -= spill_over;
+
+               #Rating cannot drop below 
+               if min_desired_rating < 0.28:
+                 min_desired_rating = 0.28;
+               ratings[big_job_counter] = min_desired_rating; 
+                   
                big_job_counter    += 1;
 
             no_completed_toys += 1;
@@ -287,8 +303,10 @@ def optimize(elf_object, boosters, big_jobs):
 
         print("**Seeking a rating : " + str(min_desired_rating));
 
+        bookkepping.append((len(big_jobs), no_completed_toys, min_desired_rating, spill_over, len(boosters)));
+
         #Iterate through the boosters and increase the productivity
-        while (elf_object.rating < min_desired_rating or len(big_jobs) == 0) and no_completed_toys < total_no_of_toys:
+        while ( round(elf_object.rating,3) + 0.002 < round(min_desired_rating,3) or len(big_jobs) == 0) and no_completed_toys < total_no_of_toys:
             print("***Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)))
 
             if len(boosters) == 0:
