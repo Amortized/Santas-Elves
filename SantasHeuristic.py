@@ -318,13 +318,13 @@ def optimize(elf_object, boosters, big_jobs):
             if played == False:
                 #Set the next available time to next day, 9:00 am
                 work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / hrs.minutes_in_24h));
-                completion_yr   = play_elf(output, elf_object, boosters[k][0], boosters[k][1], work_start_time);
+                completion_yr   = play_elf(output, elf_object, boosters[toy_played_index][0], boosters[toy_played_index][1], work_start_time);
                 if completion_yr > last_job_completed_year:
                     last_job_completed_year = completion_yr;
                 no_completed_toys += 1;
 
             #Remove the toy played
-            del boosters[k];
+            del boosters[toy_played_index];
 
 
     #Sort the output based on work_start_time
