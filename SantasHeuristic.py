@@ -303,7 +303,6 @@ def optimize(elf_object, boosters, big_jobs):
 
         print("**Seeking a rating : " + str(min_desired_rating));
 
-        bookkepping.append((len(big_jobs), no_completed_toys, min_desired_rating, spill_over, len(boosters)));
 
         #Iterate through the boosters and increase the productivity
         while ( round(elf_object.rating,3) + 0.002 < round(min_desired_rating,3) or len(big_jobs) == 0) and no_completed_toys < total_no_of_toys:
