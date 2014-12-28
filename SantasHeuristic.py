@@ -258,7 +258,9 @@ def optimize(elf_object, boosters, big_jobs):
 
     total_no_of_toys            = len(boosters) + len(big_jobs);
     #Sort the big jobs in descending order of duration
-    big_jobs.sort(key=operator.itemgetter(1),reverse=True)
+    big_jobs.sort(key=operator.itemgetter(1),reverse=True);
+    #Sort the boosters in ascending order of duration
+    boosters.sort(key=operator.itemgetter(1));
 
     no_completed_toys = 0;
     big_job_counter   = 0;
@@ -311,37 +313,30 @@ def optimize(elf_object, boosters, big_jobs):
             if len(boosters) == 0:
                 break;
 
-            shuffle(boosters);
-            min_unsanctioned_time = sys.maxsize;
-            played                = False;
-            toy_played_index      = 0;
+            #Generate a random no
+            random_toy = randint(0, len(boosters)-1);
 
-            for k in range(0, len(boosters)):
-                #Play the one with no unsanctioned time
-                sanctioned, unsanctioned = breakDownWork(elf_object.next_available_time, elf_object, boosters[k][1], hrs);
-                if unsanctioned == 0:
-                    completion_yr = play_elf(output, elf_object, boosters[k][0], boosters[k][1]);
-                    if completion_yr > last_job_completed_year:
-                        last_job_completed_year = completion_yr;
+            #Play the one with no unsanctioned time
+            sanctioned, unsanctioned = breakDownWork(elf_object.next_available_time, elf_object, boosters[random_toy][1], hrs);
 
-                    toy_played_index = k;
-                    played = True;
-                    no_completed_toys += 1;
-                    break;
-                elif unsanctioned < min_unsanctioned_time:
-                    min_unsanctioned_time = unsanctioned;
-                    toy_played_index      = k;
-
-            if played == False:
+            if unsanctioned == 0:
+                completion_yr = play_elf(output, elf_object, boosters[random_toy][0], boosters[random_toy][1]);
+                #Remove the toy played
+                del boosters[random_toy];                
+            else:
+                #Play the first toy as it has the least amount of unsanctioned time
                 #Set the next available time to next day, 9:00 am
                 work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / hrs.minutes_in_24h));
-                completion_yr   = play_elf(output, elf_object, boosters[toy_played_index][0], boosters[toy_played_index][1], work_start_time);
-                if completion_yr > last_job_completed_year:
-                    last_job_completed_year = completion_yr;
-                no_completed_toys += 1;
+                completion_yr   = play_elf(output, elf_object, boosters[0][0], boosters[0][1], work_start_time);
+                
+                del boosters[0];
 
-            #Remove the toy played
-            del boosters[toy_played_index];
+            if completion_yr > last_job_completed_year:
+                last_job_completed_year = completion_yr;
+            no_completed_toys += 1;                
+
+            
+            
 
 
     #Sort the output based on work_start_time
@@ -377,7 +372,7 @@ if __name__ == '__main__':
     santa.allocate_baskets_to_elf();
 
     #Contruct parameters as a list
-    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, NUM_ELVES+1) ];
+    elf_worflows = [ (santa.elves[i][0], santa.elves[i][1], santa.elves[i][2]) for i in xrange(1, 2) ];
 
     #Create a Thread pool.
     pool     = Pool();
