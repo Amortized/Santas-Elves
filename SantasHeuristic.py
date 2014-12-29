@@ -279,7 +279,7 @@ def optimize(elf_object, boosters, big_jobs):
         
         if len(big_jobs) > 0:
             print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)) + " Last Completed Year : " +str(last_job_completed_year) + " Duration(hr) : " +str( int(big_jobs[0][1]/60.0) ));
-
+            time.sleep(0.05)
             #Play the first toy in the queue on the following day
             work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / float(hrs.minutes_in_24h)));
             completion_yr   = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1], work_start_time);
@@ -293,13 +293,13 @@ def optimize(elf_object, boosters, big_jobs):
 
             #Change the desired rating based on hr duration of upcoming job
             if len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 350:
-               min_desired_rating = 0.34;
+               min_desired_rating = 0.38;
             elif len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 300 and int(big_jobs[0][1]/60.0) < 350:
-               min_desired_rating = 0.32; 
+               min_desired_rating = 0.34; 
             elif len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 250 and int(big_jobs[0][1]/60.0) < 300:
-               min_desired_rating = 0.31;
+               min_desired_rating = 0.33;
             elif len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 200 and int(big_jobs[0][1]/60.0) < 250:
-               min_desired_rating = 0.30;   
+               min_desired_rating = 0.31;   
             else:
                min_desired_rating = 0.28; 
 
@@ -374,6 +374,7 @@ if __name__ == '__main__':
     toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
     santa     = Santas_lab(NUM_ELVES, toy_file);
     santa.allocate_baskets_to_elf();
+
 
     #Contruct parameters as a list
     elf_worflows = [ (Elf(i), copy.copy(santa.elves[i][1]), copy.copy(santa.elves[i][2]) ) for i in xrange(1, NUM_ELVES+1) ];
