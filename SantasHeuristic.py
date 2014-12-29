@@ -258,7 +258,7 @@ def optimize(elf_object, boosters, big_jobs):
     hrs                         = Hours();
     last_job_completed_year     = 0;
 
-    alpha                       = 0.02;           #BumpupParameter
+    alpha                       = 0.00;           #BumpupParameter
     min_desired_rating          = (0.25 + alpha); #Base Min Rate + Bumpup Parameter
 
     total_no_of_toys            = len(boosters) + len(big_jobs);
@@ -268,23 +268,17 @@ def optimize(elf_object, boosters, big_jobs):
     boosters.sort(key=operator.itemgetter(1));
 
     no_completed_toys = 0;
-    big_job_counter   = 0;
 
-    ratings           = generateOptimumRatings(big_jobs, boosters, hrs, alpha);
+    #Does not work as well
+    #ratings           = generateOptimumRatings(big_jobs, boosters, hrs, alpha); 
 
 
-    spill_over        = 0.0;    
 
     while no_completed_toys < total_no_of_toys:
-
-        #print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)) + " Last Completed Year : " +str(last_job_completed_year));
+        
         
         if len(big_jobs) > 0:
-
-            if big_job_counter > 0 and len(boosters) > 0:
-              spill_over = (elf_object.rating - ratings[big_job_counter-1]);
-              #print("*Spill Over : " + str(spill_over));
-
+            print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)) + " Last Completed Year : " +str(last_job_completed_year) + " Duration(hr) : " +str( int(big_jobs[0][1]/60.0) ));
 
             #Play the first toy in the queue on the following day
             work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / float(hrs.minutes_in_24h)));
@@ -297,28 +291,28 @@ def optimize(elf_object, boosters, big_jobs):
             #Delete this toy
             del big_jobs[0];
 
-            #Set the desired rating for the next job
-            if big_job_counter < len(ratings):
-               min_desired_rating  = ratings[big_job_counter];
-               if (min_desired_rating - spill_over) >= 0.25:
-                  min_desired_rating -= spill_over;
+            #Change the desired rating based on hr duration of upcoming job
+            if len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 350:
+               min_desired_rating = 0.34;
+            elif len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 300 and int(big_jobs[0][1]/60.0) < 350:
+               min_desired_rating = 0.32; 
+            elif len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 250 and int(big_jobs[0][1]/60.0) < 300:
+               min_desired_rating = 0.31;
+            elif len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 200 and int(big_jobs[0][1]/60.0) < 250:
+               min_desired_rating = 0.30;   
+            else:
+               min_desired_rating = 0.28; 
 
-               #Rating cannot drop below 
-               if min_desired_rating < (0.25 + alpha):
-                 min_desired_rating = (0.25 + alpha);
-               ratings[big_job_counter] = min_desired_rating; 
-                   
-               big_job_counter    += 1;
 
             no_completed_toys += 1;
 
 
-        #print("**Seeking a rating : " + str(min_desired_rating));
+        print("**Seeking a rating : " + str(min_desired_rating));
 
 
         #Iterate through the boosters and increase the productivity
-        while ( round(elf_object.rating,3) + 0.002 < round(min_desired_rating,3) or len(big_jobs) == 0) and no_completed_toys < total_no_of_toys:
-            #print("***Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)))
+        while ( round(elf_object.rating,2) + 0.01 < round(min_desired_rating,2) or len(big_jobs) == 0) and no_completed_toys < total_no_of_toys:
+            print("***Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)))
 
             if len(boosters) == 0:
                 break;
