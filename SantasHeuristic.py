@@ -287,7 +287,7 @@ def optimize(elf_object, boosters, big_jobs):
 
 
             #Play the first toy in the queue on the following day
-            work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / hrs.minutes_in_24h));
+            work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / float(hrs.minutes_in_24h)));
             completion_yr   = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1], work_start_time);
 
             #completion_yr = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1]);
@@ -336,7 +336,7 @@ def optimize(elf_object, boosters, big_jobs):
             else:
                 #Play the first toy as it has the least amount of unsanctioned time
                 #Set the next available time to next day, 9:00 am
-                work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / hrs.minutes_in_24h));
+                work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / float(hrs.minutes_in_24h)));
                 completion_yr   = play_elf(output, elf_object, boosters[0][0], boosters[0][1], work_start_time);
                 
                 del boosters[0];
