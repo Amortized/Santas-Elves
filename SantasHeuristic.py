@@ -258,7 +258,7 @@ def optimize(elf_object, boosters, big_jobs):
     hrs                         = Hours();
     last_job_completed_year     = 0;
 
-    alpha                       = 0.08;           #BumpupParameter
+    alpha                       = 0.02;           #BumpupParameter
     min_desired_rating          = (0.25 + alpha); #Base Min Rate + Bumpup Parameter
 
     total_no_of_toys            = len(boosters) + len(big_jobs);
