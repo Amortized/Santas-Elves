@@ -59,13 +59,13 @@ class Santas_lab(object):
             toysfile.next()  # header row
 
             for row in toysfile:
-              i = i + 1;
-              if i % 10000 == 0:
-                  print("Reading # " + str(i))
-              current_toy       = ( int(row[0]), float(row[2]) );
-              #Find the right bucket no
-              bucket                   = 1 + int(round(math.log(current_toy[1]), 4) / duration_log_granularity); #Rounded to log_granularity decimal places
-              self.toy_baskets[bucket].append(current_toy);
+                i = i + 1;
+                if i % 10000 == 0:
+                    print("Reading # " + str(i))
+                current_toy       = ( int(row[0]), float(row[2]) );
+                #Find the right bucket no
+                bucket                   = 1 + int(round(math.log(current_toy[1]), 4) / duration_log_granularity); #Rounded to log_granularity decimal places
+                self.toy_baskets[bucket].append(current_toy);
 
 
 
@@ -85,9 +85,9 @@ class Santas_lab(object):
             for i in range(0, (toys_per_elf*self.NUM_ELVES)):
                 duration_hr = int(toys[i][1]/60.0);
                 if duration_hr <= self.boost_productive_th:
-                    self.elves[current_elf_id][1].append((  toys[i][0]  , toys[i][1] ))  
+                    self.elves[current_elf_id][1].append((  toys[i][0]  , toys[i][1] ))
                 else:
-                    self.elves[current_elf_id][2].append((  toys[i][0]  , toys[i][1] ))  
+                    self.elves[current_elf_id][2].append((  toys[i][0]  , toys[i][1] ))
 
                 current_elf_id += 1;
                 if current_elf_id > self.NUM_ELVES:
@@ -99,9 +99,9 @@ class Santas_lab(object):
 
                 duration_hr = int(toys[i][1]/60.0);
                 if duration_hr <= self.boost_productive_th:
-                    self.elves[random_toy][1].append((  toys[i][0]  , toys[i][1] ))  
+                    self.elves[random_toy][1].append((  toys[i][0]  , toys[i][1] ))
                 else:
-                    self.elves[random_toy][2].append((  toys[i][0]  , toys[i][1] ))  
+                    self.elves[random_toy][2].append((  toys[i][0]  , toys[i][1] ))
 
 
 
@@ -153,14 +153,14 @@ def play_elf(output, elf_object, toy_id, toy_duration, work_start_time=None):
     ref_time     = datetime.datetime(2014, 1, 1, 0, 0);
 
     if work_start_time == None:
-           work_start_time = elf_object.next_available_time;
+        work_start_time = elf_object.next_available_time;
 
 
     elf_object.next_available_time, work_duration = \
         assign_elf_to_toy(work_start_time, elf_object, toy_duration, hrs);
     elf_object.update_elf(hrs, Toy(toy_id, '2014 01 01 01 01' ,toy_duration), work_start_time, work_duration); #Every toy has default arrival time(irrelevant)
 
- 
+
     tt = ref_time + datetime.timedelta(seconds=60*work_start_time)
     time_string = " ".join([str(tt.year), str(tt.month), str(tt.day), str(tt.hour), str(tt.minute)])
 
@@ -183,9 +183,9 @@ def powerRequiredEstimation(big_jobs, hrs):
 
 
     for job in big_jobs:
-      #Play the toys at min rating at 9:00 on start of the day
-      sanctioned, unsanctioned = breakDownWork(dummy_elf.next_available_time, dummy_elf, job[1], hrs);
-      power_per_unit.append(unsanctioned);
+        #Play the toys at min rating at 9:00 on start of the day
+        sanctioned, unsanctioned = breakDownWork(dummy_elf.next_available_time, dummy_elf, job[1], hrs);
+        power_per_unit.append(unsanctioned);
 
     total_power    = sum(power_per_unit);
     power_per_unit = [i/float(total_power) for i in power_per_unit];
@@ -196,7 +196,7 @@ def powerAvailableEstimation(big_jobs, boosters, hrs):
     '''
       Assume a rating of 0.25, total gain in ratings that can be obtained for different jobs 
     '''
-   
+
     total_gain              = 0.0;
     ratio_big_jobs_boosters = len(big_jobs) / float( len(big_jobs)  + len(boosters) );
 
@@ -209,10 +209,10 @@ def powerAvailableEstimation(big_jobs, boosters, hrs):
     shuffle(boosters);
 
     for job in boosters:
-        
+
         #Assume the work starts at 9:00 on start of the day
         next_available_time, work_duration = \
-           assign_elf_to_toy(work_start_time, dummy_elf, job[1], hrs);
+            assign_elf_to_toy(work_start_time, dummy_elf, job[1], hrs);
 
         dummy_elf.update_elf(hrs, Toy(0, '2014 01 01 01 01' ,job[1]), work_start_time, work_duration); #Every toy has default arrival time(irrelevant)
 
@@ -220,7 +220,7 @@ def powerAvailableEstimation(big_jobs, boosters, hrs):
         if random.random() < ratio_big_jobs_boosters:
             #Big Job Played - Measure the gain
             if dummy_elf.rating > 0.25:
-               total_gain += (dummy_elf.rating - 0.25);
+                total_gain += (dummy_elf.rating - 0.25);
             #Reinitialize the dummy_elf
             dummy_elf               = Elf(0);
             dummy_elf.rating        = 0.25;
@@ -233,12 +233,12 @@ def generateOptimumRatings(big_jobs, boosters, hrs, alpha):
     '''
        Generates optimimum ratings for the big_jobs to be operated on
     '''
-    
+
     #Generate desired ratings
     power_reqd_per_unit  = powerRequiredEstimation(big_jobs, hrs);
     #Total Gain Estimation - Repeat the random process x=10 times
     total_gain           = sum([powerAvailableEstimation(big_jobs, boosters, hrs) for x in range(0, 10)]) / float(10.0);
-    
+
     ratings              = [ 0.25 + alpha + (power_reqd_per_unit[i] * total_gain) for i in range(0, len(power_reqd_per_unit))];
 
     return ratings;
@@ -258,7 +258,7 @@ def optimize(elf_object, boosters, big_jobs):
     hrs                         = Hours();
     last_job_completed_year     = 0;
 
-    alpha                       = 0.00;           #BumpupParameter
+    alpha                       = 0.02;           #BumpupParameter
     min_desired_rating          = (0.25 + alpha); #Base Min Rate + Bumpup Parameter
 
     total_no_of_toys            = len(boosters) + len(big_jobs);
@@ -268,18 +268,24 @@ def optimize(elf_object, boosters, big_jobs):
     boosters.sort(key=operator.itemgetter(1));
 
     no_completed_toys = 0;
+    big_job_counter   = 0;
 
-    #Does not work as well
-    #ratings           = generateOptimumRatings(big_jobs, boosters, hrs, alpha); 
+    ratings           = generateOptimumRatings(big_jobs, boosters, hrs, alpha);
 
 
+    spill_over        = 0.0;
 
     while no_completed_toys < total_no_of_toys:
-        
-        
+
+        #print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)) + " Last Completed Year : " +str(last_job_completed_year));
+
         if len(big_jobs) > 0:
-            print("Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)) + " Last Completed Year : " +str(last_job_completed_year) + " Duration(hr) : " +str( int(big_jobs[0][1]/60.0) ));
-            time.sleep(0.05)
+
+            if big_job_counter > 0 and len(boosters) > 0:
+                spill_over = (elf_object.rating - ratings[big_job_counter-1]);
+                #print("*Spill Over : " + str(spill_over));
+
+
             #Play the first toy in the queue on the following day
             work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / float(hrs.minutes_in_24h)));
             completion_yr   = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1], work_start_time);
@@ -287,32 +293,32 @@ def optimize(elf_object, boosters, big_jobs):
             #completion_yr = play_elf(output, elf_object, big_jobs[0][0], big_jobs[0][1]);
             if completion_yr > last_job_completed_year:
                 last_job_completed_year = completion_yr;
-            
+
             #Delete this toy
             del big_jobs[0];
 
-            #Change the desired rating based on hr duration of upcoming job
-            if len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 350:
-               min_desired_rating = 0.38;
-            elif len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 300 and int(big_jobs[0][1]/60.0) < 350:
-               min_desired_rating = 0.34; 
-            elif len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 250 and int(big_jobs[0][1]/60.0) < 300:
-               min_desired_rating = 0.33;
-            elif len(big_jobs) > 0 and int(big_jobs[0][1]/60.0) >= 200 and int(big_jobs[0][1]/60.0) < 250:
-               min_desired_rating = 0.31;   
-            else:
-               min_desired_rating = 0.28; 
+            #Set the desired rating for the next job
+            if big_job_counter < len(ratings):
+                min_desired_rating  = ratings[big_job_counter];
+                if (min_desired_rating - spill_over) >= 0.25:
+                    min_desired_rating -= spill_over;
 
+                #Rating cannot drop below
+                if min_desired_rating < (0.25 + alpha):
+                    min_desired_rating = (0.25 + alpha);
+                ratings[big_job_counter] = min_desired_rating;
+
+                big_job_counter    += 1;
 
             no_completed_toys += 1;
 
 
-        print("**Seeking a rating : " + str(min_desired_rating));
+        #print("**Seeking a rating : " + str(min_desired_rating));
 
 
         #Iterate through the boosters and increase the productivity
-        while ( round(elf_object.rating,2) + 0.01 < round(min_desired_rating,2) or len(big_jobs) == 0) and no_completed_toys < total_no_of_toys:
-            print("***Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)))
+        while ( round(elf_object.rating,3) + 0.002 < round(min_desired_rating,3) or len(big_jobs) == 0) and no_completed_toys < total_no_of_toys:
+            #print("***Optimizing : Elf " + str(elf_object.id) + " Rating : " + str(elf_object.rating) + " Completed : " + str(no_completed_toys) + " Boosters : " + str(len(boosters)) + " Big Jobs : " + str(len(big_jobs)))
 
             if len(boosters) == 0:
                 break;
@@ -326,24 +332,24 @@ def optimize(elf_object, boosters, big_jobs):
             if unsanctioned == 0:
                 completion_yr = play_elf(output, elf_object, boosters[random_toy][0], boosters[random_toy][1]);
                 #Remove the toy played
-                del boosters[random_toy];                
+                del boosters[random_toy];
             else:
                 #Play the first toy as it has the least amount of unsanctioned time
                 #Set the next available time to next day, 9:00 am
                 work_start_time = hrs.day_start  + int(hrs.minutes_in_24h * math.ceil(elf_object.next_available_time / float(hrs.minutes_in_24h)));
                 completion_yr   = play_elf(output, elf_object, boosters[0][0], boosters[0][1], work_start_time);
-                
+
                 del boosters[0];
 
             if completion_yr > last_job_completed_year:
                 last_job_completed_year = completion_yr;
-            no_completed_toys += 1;                
-
-            
-            
+            no_completed_toys += 1;
 
 
-    #Sort the output based on work_start_time
+
+
+
+            #Sort the output based on work_start_time
     output.sort(key=operator.itemgetter(3));
 
 
@@ -360,7 +366,7 @@ def optimize(elf_object, boosters, big_jobs):
 def optimize_wrapper(args):
     return optimize(*args);
 
-                
+
 
 # ======================================================================= #
 # === MAIN === #
@@ -374,7 +380,6 @@ if __name__ == '__main__':
     toy_file  = os.path.join(os.getcwd(), 'data/toys_rev2.csv');
     santa     = Santas_lab(NUM_ELVES, toy_file);
     santa.allocate_baskets_to_elf();
-
 
     #Contruct parameters as a list
     elf_worflows = [ (Elf(i), copy.copy(santa.elves[i][1]), copy.copy(santa.elves[i][2]) ) for i in xrange(1, NUM_ELVES+1) ];
